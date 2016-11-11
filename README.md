@@ -1,7 +1,7 @@
 Nodejs compatibility library for Goja
 ====
 
-This is a collection of modules Goja modules that provide nodejs compatibility.
+This is a collection of Goja modules that provide nodejs compatibility.
 
 Example:
 
