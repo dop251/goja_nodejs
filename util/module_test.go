@@ -58,9 +58,9 @@ func TestUtil_Format_MoreArgs(t *testing.T) {
 
 func TestJSNoArgs(t *testing.T) {
 	vm := goja.New()
-	new(require.Require).Enable(vm)
+	new(require.Registry).Enable(vm)
 
-	if util, ok := require.Req(vm, "util").(*goja.Object); ok {
+	if util, ok := require.Require(vm, "util").(*goja.Object); ok {
 		if format, ok := goja.AssertFunction(util.Get("format")); ok {
 			res, err := format(util)
 			if err != nil {

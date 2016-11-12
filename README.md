@@ -14,10 +14,10 @@ import (
 )
 
 func main() {
-    require := new(require.Require) // this can be shared by multiple runtimes
+    registry := new(require.Registry) // this can be shared by multiple runtimes
 
     runtime := goja.New()
-    req := require.Enable(runtime)
+    req := registry.Enable(runtime)
 
     runtime.RunString(`
     var m = require("m.js");

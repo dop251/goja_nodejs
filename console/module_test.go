@@ -9,7 +9,7 @@ import (
 func TestConsole(t *testing.T) {
 	vm := goja.New()
 
-	new(require.Require).Enable(vm)
+	new(require.Registry).Enable(vm)
 	Enable(vm)
 
 	if c := vm.Get("console"); c == nil {

@@ -14,8 +14,8 @@ func TestRequire(t *testing.T) {
 
 	vm := js.New()
 
-	require := new(Require)
-	require.Enable(vm)
+	registry := new(Registry)
+	registry.Enable(vm)
 
 	v, err := vm.RunString(SCRIPT)
 	if err != nil {

@@ -20,19 +20,19 @@ var (
 var native map[string]ModuleLoader
 
 // Require contains a cache of compiled modules which can be used by multiple Runtimes
-type Require struct {
+type Registry struct {
 	compiled map[string]*js.Program
 	lock     sync.Mutex
 }
 
 type RequireModule struct {
-	r       *Require
+	r       *Registry
 	runtime *js.Runtime
 	modules map[string]*js.Object
 }
 
 // Enable adds the require() function to the specified runtime.
-func (r *Require) Enable(runtime *js.Runtime) *RequireModule {
+func (r *Registry) Enable(runtime *js.Runtime) *RequireModule {
 	rrt := &RequireModule{
 		r:       r,
 		runtime: runtime,
@@ -43,7 +43,7 @@ func (r *Require) Enable(runtime *js.Runtime) *RequireModule {
 	return rrt
 }
 
-func (r *Require) getCompiledSource(p string) (prg *js.Program, err error) {
+func (r *Registry) getCompiledSource(p string) (prg *js.Program, err error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -129,7 +129,7 @@ func (r *RequireModule) Require(p string) (ret js.Value, err error) {
 	return
 }
 
-func Req(runtime *js.Runtime, name string) js.Value {
+func Require(runtime *js.Runtime, name string) js.Value {
 	if r, ok := js.AssertFunction(runtime.Get("require")); ok {
 		mod, err := r(js.Undefined(), runtime.ToValue(name))
 		if err != nil {

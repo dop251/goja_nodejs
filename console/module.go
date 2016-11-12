@@ -33,7 +33,7 @@ func Require(runtime *goja.Runtime, module *goja.Object) {
 		runtime: runtime,
 	}
 
-	c.util = require.Req(runtime, "util").(*goja.Object)
+	c.util = require.Require(runtime, "util").(*goja.Object)
 
 	o := module.Get("exports").(*goja.Object)
 	o.Set("log", c.log)
@@ -41,7 +41,7 @@ func Require(runtime *goja.Runtime, module *goja.Object) {
 }
 
 func Enable(runtime *goja.Runtime) {
-	runtime.Set("console", require.Req(runtime, "console"))
+	runtime.Set("console", require.Require(runtime, "console"))
 }
 
 func init() {
