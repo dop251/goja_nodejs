@@ -10,10 +10,14 @@ import (
 	"sync"
 )
 
+type ModuleLoader func(*js.Runtime, *js.Object)
+
 var (
 	InvalidModuleError     = errors.New("Invalid module")
 	IllegalModuleNameError = errors.New("Illegal module name")
 )
+
+var native map[string]ModuleLoader
 
 // Require contains a cache of compiled modules which can be used by multiple Runtimes
 type Require struct {
@@ -62,6 +66,12 @@ func (r *Require) getCompiledSource(p string) (prg *js.Program, err error) {
 }
 
 func (r *RequireModule) loadModule(path string, jsModule *js.Object) error {
+
+	if ldr, exists := native[path]; exists {
+		ldr(r.runtime, jsModule)
+		return nil
+	}
+
 	prg, err := r.r.getCompiledSource(path)
 
 	if err != nil {
@@ -117,4 +127,22 @@ func (r *RequireModule) Require(p string) (ret js.Value, err error) {
 	}
 	ret = module.Get("exports")
 	return
+}
+
+func Req(runtime *js.Runtime, name string) js.Value {
+	if r, ok := js.AssertFunction(runtime.Get("require")); ok {
+		mod, err := r(js.Undefined(), runtime.ToValue(name))
+		if err != nil {
+			panic(err)
+		}
+		return mod
+	}
+	panic(runtime.NewTypeError("Please enable require for this runtime using new(require.Require).Enable(runtime)"))
+}
+
+func RegisterNativeModule(name string, loader ModuleLoader) {
+	if native == nil {
+		native = make(map[string]ModuleLoader)
+	}
+	native[name] = loader
 }
