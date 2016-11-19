@@ -11,6 +11,7 @@ import (
 )
 
 type ModuleLoader func(*js.Runtime, *js.Object)
+type SourceLoader func(path string) ([]byte, error)
 
 var (
 	InvalidModuleError     = errors.New("Invalid module")
@@ -19,16 +20,24 @@ var (
 
 var native map[string]ModuleLoader
 
-// Require contains a cache of compiled modules which can be used by multiple Runtimes
+// Registry contains a cache of compiled modules which can be used by multiple Runtimes
 type Registry struct {
+	sync.Mutex
 	compiled map[string]*js.Program
-	lock     sync.Mutex
+
+	srcLoader SourceLoader
 }
 
 type RequireModule struct {
 	r       *Registry
 	runtime *js.Runtime
 	modules map[string]*js.Object
+}
+
+func NewRegistryWithLoader(srcLoader SourceLoader) *Registry {
+	return &Registry{
+		srcLoader: srcLoader,
+	}
 }
 
 // Enable adds the require() function to the specified runtime.
@@ -44,13 +53,17 @@ func (r *Registry) Enable(runtime *js.Runtime) *RequireModule {
 }
 
 func (r *Registry) getCompiledSource(p string) (prg *js.Program, err error) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	r.Lock()
+	defer r.Unlock()
 
 	prg = r.compiled[p]
 	if prg == nil {
-		if s, err1 := ioutil.ReadFile(p); err1 == nil {
-			source := "(function(module) {var exports = module.exports; " + string(s) + "\n})"
+		srcLoader := r.srcLoader
+		if srcLoader == nil {
+			srcLoader = ioutil.ReadFile
+		}
+		if s, err1 := srcLoader(p); err1 == nil {
+			source := "(function(module, exports) {" + string(s) + "\n})"
 			prg, err = js.Compile(p, source, false)
 			if err == nil {
 				if r.compiled == nil {
@@ -87,7 +100,7 @@ func (r *RequireModule) loadModule(path string, jsModule *js.Object) error {
 		jsExports := jsModule.Get("exports")
 
 		// Run the module source, with "jsModule" as the "module" variable, "jsExports" as "this"(Nodejs capable).
-		_, err = call(jsExports, jsModule)
+		_, err = call(jsExports, jsModule, jsExports)
 		if err != nil {
 			return err
 		}
