@@ -19,4 +19,8 @@ func TestConsole(t *testing.T) {
 	if _, err := vm.RunString("console.log('')"); err != nil {
 		t.Fatal("console.log() error", err)
 	}
+
+	if _, err := vm.RunString("console.error('')"); err != nil {
+		t.Fatal("console.error() error", err)
+	}
 }
