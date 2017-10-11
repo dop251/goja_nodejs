@@ -38,6 +38,7 @@ func Require(runtime *goja.Runtime, module *goja.Object) {
 	o := module.Get("exports").(*goja.Object)
 	o.Set("log", c.log)
 	o.Set("error", c.log)
+	o.Set("warn", c.log)
 
 }
 
