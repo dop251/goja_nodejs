@@ -1,9 +1,10 @@
 package console
 
 import (
+	"testing"
+
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/require"
-	"testing"
 )
 
 func TestConsole(t *testing.T) {
@@ -22,5 +23,9 @@ func TestConsole(t *testing.T) {
 
 	if _, err := vm.RunString("console.error('')"); err != nil {
 		t.Fatal("console.error() error", err)
+	}
+
+	if _, err := vm.RunString("console.warn('')"); err != nil {
+		t.Fatal("console.warn() error", err)
 	}
 }
