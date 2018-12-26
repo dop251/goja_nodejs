@@ -1,10 +1,12 @@
 package eventloop
 
 import (
+	"context"
+	"time"
+
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
-	"time"
 )
 
 type job struct {
@@ -29,6 +31,7 @@ type EventLoop struct {
 	jobChan  chan func()
 	jobCount int32
 	running  bool
+	ctx      context.Context
 }
 
 func NewEventLoop() *EventLoop {
@@ -105,9 +108,22 @@ func (loop *EventLoop) Stop() {
 // The instance of goja.Runtime that is passed to the function and any Values derived from it must not be used outside
 // of the function.
 func (loop *EventLoop) RunOnLoop(fn func(*goja.Runtime)) {
+	loop.RunOnLoopWithContext(nil, fn)
+}
+
+// RunOnLoopWithContext is the same as RunOnLoop, but lets callers also specify a context for the event run.
+// On completion, the context is reset.
+func (loop *EventLoop) RunOnLoopWithContext(ctx context.Context, fn func(*goja.Runtime)) {
 	loop.jobChan <- func() {
+		loop.ctx = ctx
 		fn(loop.vm)
+		loop.ctx = nil
 	}
+}
+
+// GetContext returns the event loop context
+func (loop *EventLoop) GetContext() context.Context {
+	return loop.ctx
 }
 
 func (loop *EventLoop) run(inBackground bool) {
