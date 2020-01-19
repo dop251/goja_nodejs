@@ -111,6 +111,10 @@ func (loop *EventLoop) RunOnLoop(fn func(*goja.Runtime)) {
 }
 
 func (loop *EventLoop) run(inBackground bool) {
+	if !inBackground && loop.jobCount <= 0 {
+		return
+	}
+
 	loop.running = true
 	for job := range loop.jobChan {
 		job()
