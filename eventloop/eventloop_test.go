@@ -69,3 +69,16 @@ func TestInterval(t *testing.T) {
 		vm.RunProgram(prg)
 	})
 }
+
+func TestRunNoSchedule(t *testing.T) {
+	loop := NewEventLoop()
+	fired := false
+	loop.Run(func(vm *goja.Runtime) { // should not hang
+		fired = true
+		// do not schedule anything
+	})
+
+	if !fired {
+		t.Fatal("Not fired")
+	}
+}

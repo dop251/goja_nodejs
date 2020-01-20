@@ -79,12 +79,12 @@ func (loop *EventLoop) setInterval(call goja.FunctionCall) goja.Value {
 // of the function.
 func (loop *EventLoop) Run(fn func(*goja.Runtime)) {
 	fn(loop.vm)
-	loop.run(false)
+	loop.run()
 }
 
 // Start the event loop in the background. The loop continues to run until Stop() is called.
 func (loop *EventLoop) Start() {
-	go loop.run(true)
+	go loop.runInBackground()
 }
 
 // Stop the loop that was started with Start(). After this function returns there will be no more jobs executed
@@ -110,11 +110,22 @@ func (loop *EventLoop) RunOnLoop(fn func(*goja.Runtime)) {
 	}
 }
 
-func (loop *EventLoop) run(inBackground bool) {
+func (loop *EventLoop) run() {
+	loop.running = true
+	for loop.running && loop.jobCount > 0 {
+		job, ok := <- loop.jobChan
+		if !ok {
+			break
+		}
+		job()
+	}
+}
+
+func (loop *EventLoop) runInBackground() {
 	loop.running = true
 	for job := range loop.jobChan {
 		job()
-		if !loop.running || !inBackground && loop.jobCount <= 0 {
+		if !loop.running {
 			break
 		}
 	}
