@@ -21,7 +21,7 @@ type timer struct {
 type interval struct {
 	job
 	ticker   *time.Ticker
-	stopChan chan int
+	stopChan chan struct{}
 }
 
 type EventLoop struct {
@@ -77,6 +77,7 @@ func (loop *EventLoop) setInterval(call goja.FunctionCall) goja.Value {
 // after which it stops the loop and returns.
 // The instance of goja.Runtime that is passed to the function and any Values derived from it must not be used outside
 // of the function.
+// Do NOT use this function while the loop is already running. Use RunOnLoop() instead.
 func (loop *EventLoop) Run(fn func(*goja.Runtime)) {
 	fn(loop.vm)
 	loop.run()
@@ -89,12 +90,13 @@ func (loop *EventLoop) Start() {
 
 // Stop the loop that was started with Start(). After this function returns there will be no more jobs executed
 // by the loop. It is possible to call Start() or Run() again after this to resume the execution.
+// Note, it does not cancel active timeouts.
 func (loop *EventLoop) Stop() {
-	ch := make(chan int)
+	ch := make(chan struct{})
 
 	loop.jobChan <- func() {
 		loop.running = false
-		ch <- 1
+		ch <- struct{}{}
 	}
 
 	<-ch
@@ -150,7 +152,7 @@ func (loop *EventLoop) addInterval(f goja.Callable, timeout time.Duration, args 
 	i := &interval{
 		job:      job{Callable: f, args: args},
 		ticker:   time.NewTicker(timeout),
-		stopChan: make(chan int),
+		stopChan: make(chan struct{}),
 	}
 
 	go i.run(loop)
@@ -183,7 +185,7 @@ func (loop *EventLoop) clearTimeout(t *timer) {
 func (loop *EventLoop) clearInterval(i *interval) {
 	if !i.cancelled {
 		i.cancelled = true
-		i.stopChan <- 1
+		i.stopChan <- struct{}{}
 		loop.jobCount--
 	}
 }
