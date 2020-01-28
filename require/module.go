@@ -119,9 +119,13 @@ func (r *RequireModule) require(call js.FunctionCall) js.Value {
 	return ret
 }
 
+func filepathClean(p string) string {
+	return filepath.Clean(p)
+}
+
 // Require can be used to import modules from Go source (similar to JS require() function).
 func (r *RequireModule) Require(p string) (ret js.Value, err error) {
-	p = filepath.Clean(p)
+	p = filepathClean(p)
 	if p == "" {
 		err = IllegalModuleNameError
 		return
@@ -157,5 +161,6 @@ func RegisterNativeModule(name string, loader ModuleLoader) {
 	if native == nil {
 		native = make(map[string]ModuleLoader)
 	}
+	name = filepathClean(name)
 	native[name] = loader
 }

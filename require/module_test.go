@@ -7,6 +7,34 @@ import (
 	js "github.com/dop251/goja"
 )
 
+func TestRequireNativeModule(t *testing.T) {
+	const SCRIPT = `
+	var m = require("test/m");
+	m.test();
+	`
+
+	vm := js.New()
+
+	registry := new(Registry)
+	registry.Enable(vm)
+
+	RegisterNativeModule("test/m", func(runtime *js.Runtime, module *js.Object) {
+		o := module.Get("exports").(*js.Object)
+		o.Set("test", func(call js.FunctionCall) js.Value {
+			return runtime.ToValue("passed")
+		})
+	})
+
+	v, err := vm.RunString(SCRIPT)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !v.StrictEquals(vm.ToValue("passed")) {
+		t.Fatalf("Unexpected result: %v", v)
+	}
+}
+
 func TestRequire(t *testing.T) {
 	const SCRIPT = `
 	var m = require("./testdata/m.js");
