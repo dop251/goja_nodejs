@@ -115,7 +115,7 @@ func (loop *EventLoop) RunOnLoop(fn func(*goja.Runtime)) {
 func (loop *EventLoop) run() {
 	loop.running = true
 	for loop.running && loop.jobCount > 0 {
-		job, ok := <- loop.jobChan
+		job, ok := <-loop.jobChan
 		if !ok {
 			break
 		}
