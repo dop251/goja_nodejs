@@ -23,6 +23,7 @@ var native map[string]ModuleLoader
 // Registry contains a cache of compiled modules which can be used by multiple Runtimes
 type Registry struct {
 	sync.Mutex
+	native   map[string]ModuleLoader
 	compiled map[string]*js.Program
 
 	srcLoader SourceLoader
@@ -52,6 +53,17 @@ func (r *Registry) Enable(runtime *js.Runtime) *RequireModule {
 	return rrt
 }
 
+func (r *Registry) RegisterNativeModule(name string, loader ModuleLoader) {
+	r.Lock()
+	defer r.Unlock()
+
+	if r.native == nil {
+		r.native = make(map[string]ModuleLoader)
+	}
+	name = filepathClean(name)
+	r.native[name] = loader
+}
+
 func (r *Registry) getCompiledSource(p string) (prg *js.Program, err error) {
 	r.Lock()
 	defer r.Unlock()
@@ -79,6 +91,10 @@ func (r *Registry) getCompiledSource(p string) (prg *js.Program, err error) {
 }
 
 func (r *RequireModule) loadModule(path string, jsModule *js.Object) error {
+	if ldr, exists := r.r.native[path]; exists {
+		ldr(r.runtime, jsModule)
+		return nil
+	}
 
 	if ldr, exists := native[path]; exists {
 		ldr(r.runtime, jsModule)
