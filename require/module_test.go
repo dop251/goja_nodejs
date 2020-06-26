@@ -1,7 +1,10 @@
 package require
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
+	"io"
 	"testing"
 
 	js "github.com/dop251/goja"
@@ -32,6 +35,59 @@ func TestRequireNativeModule(t *testing.T) {
 
 	if !v.StrictEquals(vm.ToValue("passed")) {
 		t.Fatalf("Unexpected result: %v", v)
+	}
+}
+
+func TestRequireRegistryNativeModule(t *testing.T) {
+	const SCRIPT = `
+	var log = require("test/log");
+	log.print('passed');
+	`
+
+	logWithOutput := func(w io.Writer, prefix string) ModuleLoader {
+		return func(vm *js.Runtime, module *js.Object) {
+			o := module.Get("exports").(*js.Object)
+			o.Set("print", func(call js.FunctionCall) js.Value {
+				fmt.Fprint(w, prefix, call.Argument(0).ToString())
+				return js.Undefined()
+			})
+		}
+	}
+
+	vm1 := js.New()
+	buf1 := &bytes.Buffer{}
+
+	registry1 := new(Registry)
+	registry1.Enable(vm1)
+
+	registry1.RegisterNativeModule("test/log", logWithOutput(buf1, "vm1 "))
+
+	vm2 := js.New()
+	buf2 := &bytes.Buffer{}
+
+	registry2 := new(Registry)
+	registry2.Enable(vm2)
+
+	registry2.RegisterNativeModule("test/log", logWithOutput(buf2, "vm2 "))
+
+	_, err := vm1.RunString(SCRIPT)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s := buf1.String()
+	if s != "vm1 passed" {
+		t.Fatalf("vm1: Unexpected result: %q", s)
+	}
+
+	_, err = vm2.RunString(SCRIPT)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s = buf2.String()
+	if s != "vm2 passed" {
+		t.Fatalf("vm2: Unexpected result: %q", s)
 	}
 }
 
