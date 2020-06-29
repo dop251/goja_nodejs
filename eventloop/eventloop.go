@@ -1,10 +1,11 @@
 package eventloop
 
 import (
+	"time"
+
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
-	"time"
 )
 
 type job struct {
@@ -25,28 +26,48 @@ type interval struct {
 }
 
 type EventLoop struct {
-	vm       *goja.Runtime
-	jobChan  chan func()
-	jobCount int32
-	running  bool
+	vm            *goja.Runtime
+	jobChan       chan func()
+	jobCount      int32
+	running       bool
+	enableConsole bool
 }
 
-func NewEventLoop() *EventLoop {
+func NewEventLoop(opts ...Option) *EventLoop {
 	vm := goja.New()
 
 	loop := &EventLoop{
-		vm:      vm,
-		jobChan: make(chan func()),
+		vm:            vm,
+		jobChan:       make(chan func()),
+		enableConsole: true,
+	}
+
+	for _, opt := range opts {
+		opt(loop)
 	}
 
 	new(require.Registry).Enable(vm)
-	console.Enable(vm)
+	if loop.enableConsole {
+		console.Enable(vm)
+	}
 	vm.Set("setTimeout", loop.setTimeout)
 	vm.Set("setInterval", loop.setInterval)
 	vm.Set("clearTimeout", loop.clearTimeout)
 	vm.Set("clearInterval", loop.clearInterval)
 
 	return loop
+}
+
+type Option func(*EventLoop)
+
+// EnableConsole controls whether the "console" module is loaded into
+// the runtime used by the loop.  By default, loops are created with
+// the "console" module loaded, pass EnableConsole(false) to
+// NewEventLoop to disable this behavior.
+func EnableConsole(enableConsole bool) Option {
+	return func(loop *EventLoop) {
+		loop.enableConsole = enableConsole
+	}
 }
 
 func (loop *EventLoop) schedule(call goja.FunctionCall, repeating bool) goja.Value {

@@ -1,9 +1,10 @@
 package eventloop
 
 import (
-	"github.com/dop251/goja"
 	"testing"
 	"time"
+
+	"github.com/dop251/goja"
 )
 
 func TestRun(t *testing.T) {
@@ -80,5 +81,53 @@ func TestRunNoSchedule(t *testing.T) {
 
 	if !fired {
 		t.Fatal("Not fired")
+	}
+}
+
+func TestRunWithConsole(t *testing.T) {
+	const SCRIPT = `
+	console.log("Started");
+	`
+
+	loop := NewEventLoop()
+	prg, err := goja.Compile("main.js", SCRIPT, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loop.Run(func(vm *goja.Runtime) {
+		_, err = vm.RunProgram(prg)
+	})
+	if err != nil {
+		t.Fatal("Call to console.log generated an error", err)
+	}
+
+	loop = NewEventLoop(EnableConsole(true))
+	prg, err = goja.Compile("main.js", SCRIPT, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loop.Run(func(vm *goja.Runtime) {
+		_, err = vm.RunProgram(prg)
+	})
+	if err != nil {
+		t.Fatal("Call to console.log generated an error", err)
+	}
+}
+
+func TestRunNoConsole(t *testing.T) {
+	const SCRIPT = `
+	console.log("Started");
+	`
+
+	loop := NewEventLoop(EnableConsole(false))
+	prg, err := goja.Compile("main.js", SCRIPT, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loop.Run(func(vm *goja.Runtime) {
+		_, err = vm.RunProgram(prg)
+	})
+	if err == nil {
+		t.Fatal("Call to console.log did not generate an error", err)
 	}
 }
