@@ -71,6 +71,56 @@ func TestInterval(t *testing.T) {
 	})
 }
 
+func TestNativeTimeout(t *testing.T) {
+	fired := false
+	loop := NewEventLoop()
+	loop.SetTimeout(func(_ *goja.Runtime) {
+		fired = true
+	}, 1*time.Second)
+	loop.Run(func(_ *goja.Runtime) {
+		// do not schedule anything
+	})
+	if !fired {
+		t.Fatal("Not fired")
+	}
+}
+
+func TestNativeClearTimeout(t *testing.T) {
+	fired := false
+	loop := NewEventLoop()
+	timer := loop.SetTimeout(func(_ *goja.Runtime) {
+		fired = true
+	}, 2*time.Second)
+	loop.SetTimeout(func(_ *goja.Runtime) {
+		loop.ClearTimeout(timer)
+	}, 1*time.Second)
+	loop.Run(func(_ *goja.Runtime) {
+		// do not schedule anything
+	})
+	if fired {
+		t.Fatal("Cancelled timer fired!")
+	}
+}
+
+func TestNativeInterval(t *testing.T) {
+	count := 0
+	loop := NewEventLoop()
+	var i *Interval
+	i = loop.SetInterval(func(_ *goja.Runtime) {
+		t.Log("tick")
+		count++
+		if count > 2 {
+			loop.ClearInterval(i)
+		}
+	}, 1*time.Second)
+	loop.Run(func(_ *goja.Runtime) {
+		// do not schedule anything
+	})
+	if count != 3 {
+		t.Fatal("Expected interval to fire 3 times, got", count)
+	}
+}
+
 func TestRunNoSchedule(t *testing.T) {
 	loop := NewEventLoop()
 	fired := false
@@ -132,16 +182,33 @@ func TestRunNoConsole(t *testing.T) {
 	}
 }
 
-func TestClearIntervalRace(t *testing.T) {
+func TestNativeClearInterval(t *testing.T) {
+	count := 0
+	loop := NewEventLoop()
+	loop.Run(func(_ *goja.Runtime) {
+		i := loop.SetInterval(func(_ *goja.Runtime) {
+			t.Log("tick")
+			count++
+		}, 500*time.Millisecond)
+		<-time.After(2 * time.Second)
+		loop.ClearInterval(i)
+	})
+	if count != 0 {
+		t.Fatal("Expected interval to fire 0 times, got", count)
+	}
+}
+
+func TestClearInterval(t *testing.T) {
 	const SCRIPT = `
+	var count = 0;
 	console.log("calling setInterval");
 	var t = setInterval(function() {
 		console.log("tick");
 	}, 500);
 	console.log("calling sleep");
-	sleep(2000);
+        sleep(2000);
 	console.log("calling clearInterval");
-	clearInterval(t);
+        clearInterval(t);
 	`
 
 	loop := NewEventLoop()
@@ -149,11 +216,16 @@ func TestClearIntervalRace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Should not hang
+	var count int64
 	loop.Run(func(vm *goja.Runtime) {
 		vm.Set("sleep", func(ms int) {
 			<-time.After(time.Duration(ms) * time.Millisecond)
 		})
 		vm.RunProgram(prg)
+		count = vm.Get("count").ToInteger()
 	})
+
+	if count != 0 {
+		t.Fatal("Expected count 0, got", 0)
+	}
 }
