@@ -131,3 +131,29 @@ func TestRunNoConsole(t *testing.T) {
 		t.Fatal("Call to console.log did not generate an error", err)
 	}
 }
+
+func TestClearIntervalRace(t *testing.T) {
+	const SCRIPT = `
+	console.log("calling setInterval");
+	var t = setInterval(function() {
+		console.log("tick");
+	}, 500);
+	console.log("calling sleep");
+	sleep(2000);
+	console.log("calling clearInterval");
+	clearInterval(t);
+	`
+
+	loop := NewEventLoop()
+	prg, err := goja.Compile("main.js", SCRIPT, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Should not hang
+	loop.Run(func(vm *goja.Runtime) {
+		vm.Set("sleep", func(ms int) {
+			<-time.After(time.Duration(ms) * time.Millisecond)
+		})
+		vm.RunProgram(prg)
+	})
+}

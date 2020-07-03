@@ -206,7 +206,7 @@ func (loop *EventLoop) clearTimeout(t *timer) {
 func (loop *EventLoop) clearInterval(i *interval) {
 	if !i.cancelled {
 		i.cancelled = true
-		i.stopChan <- struct{}{}
+		close(i.stopChan)
 		loop.jobCount--
 	}
 }
