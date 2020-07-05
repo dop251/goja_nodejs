@@ -1,6 +1,7 @@
 package eventloop
 
 import (
+	"sync"
 	"time"
 
 	"github.com/dop251/goja"
@@ -9,27 +10,31 @@ import (
 )
 
 type job struct {
-	goja.Callable
-	args      []goja.Value
 	cancelled bool
+	fn        func()
 }
 
-type timer struct {
+type Timer struct {
 	job
 	timer *time.Timer
 }
 
-type interval struct {
+type Interval struct {
 	job
 	ticker   *time.Ticker
 	stopChan chan struct{}
 }
 
 type EventLoop struct {
-	vm            *goja.Runtime
-	jobChan       chan func()
-	jobCount      int32
-	running       bool
+	vm       *goja.Runtime
+	jobChan  chan func()
+	jobCount int32
+	running  bool
+
+	immediateJobs     []func()
+	immediateJobsLock sync.Mutex
+	wakeup            chan struct{}
+
 	enableConsole bool
 }
 
@@ -39,6 +44,7 @@ func NewEventLoop(opts ...Option) *EventLoop {
 	loop := &EventLoop{
 		vm:            vm,
 		jobChan:       make(chan func()),
+		wakeup:        make(chan struct{}, 1),
 		enableConsole: true,
 	}
 
@@ -77,10 +83,12 @@ func (loop *EventLoop) schedule(call goja.FunctionCall, repeating bool) goja.Val
 		if len(call.Arguments) > 2 {
 			args = call.Arguments[2:]
 		}
+		f := func() { fn(nil, args...) }
+		loop.jobCount++
 		if repeating {
-			return loop.vm.ToValue(loop.addInterval(fn, time.Duration(delay)*time.Millisecond, args))
+			return loop.vm.ToValue(loop.addInterval(f, time.Duration(delay)*time.Millisecond))
 		} else {
-			return loop.vm.ToValue(loop.addTimeout(fn, time.Duration(delay)*time.Millisecond, args))
+			return loop.vm.ToValue(loop.addTimeout(f, time.Duration(delay)*time.Millisecond))
 		}
 	}
 	return nil
@@ -94,6 +102,34 @@ func (loop *EventLoop) setInterval(call goja.FunctionCall) goja.Value {
 	return loop.schedule(call, true)
 }
 
+func (loop *EventLoop) SetTimeout(fn func(*goja.Runtime), timeout time.Duration) *Timer {
+	t := loop.addTimeout(func() { fn(loop.vm) }, timeout)
+	loop.addImmediateJob(func() {
+		loop.jobCount++
+	})
+	return t
+}
+
+func (loop *EventLoop) ClearTimeout(t *Timer) {
+	loop.addImmediateJob(func() {
+		loop.clearTimeout(t)
+	})
+}
+
+func (loop *EventLoop) SetInterval(fn func(*goja.Runtime), timeout time.Duration) *Interval {
+	i := loop.addInterval(func() { fn(loop.vm) }, timeout)
+	loop.addImmediateJob(func() {
+		loop.jobCount++
+	})
+	return i
+}
+
+func (loop *EventLoop) ClearInterval(i *Interval) {
+	loop.addImmediateJob(func() {
+		loop.clearInterval(i)
+	})
+}
+
 // Run calls the specified function, starts the event loop and waits until there are no more delayed jobs to run
 // after which it stops the loop and returns.
 // The instance of goja.Runtime that is passed to the function and any Values derived from it must not be used outside
@@ -101,12 +137,12 @@ func (loop *EventLoop) setInterval(call goja.FunctionCall) goja.Value {
 // Do NOT use this function while the loop is already running. Use RunOnLoop() instead.
 func (loop *EventLoop) Run(fn func(*goja.Runtime)) {
 	fn(loop.vm)
-	loop.run()
+	loop.run(false)
 }
 
 // Start the event loop in the background. The loop continues to run until Stop() is called.
 func (loop *EventLoop) Start() {
-	go loop.runInBackground()
+	go loop.run(true)
 }
 
 // Stop the loop that was started with Start(). After this function returns there will be no more jobs executed
@@ -128,74 +164,91 @@ func (loop *EventLoop) Stop() {
 // The instance of goja.Runtime that is passed to the function and any Values derived from it must not be used outside
 // of the function.
 func (loop *EventLoop) RunOnLoop(fn func(*goja.Runtime)) {
-	loop.jobChan <- func() {
-		fn(loop.vm)
-	}
+	loop.addImmediateJob(func() { fn(loop.vm) })
 }
 
-func (loop *EventLoop) run() {
+func (loop *EventLoop) run(inBackground bool) {
 	loop.running = true
-	for loop.running && loop.jobCount > 0 {
-		job, ok := <-loop.jobChan
-		if !ok {
+L:
+	for {
+		for {
+			loop.immediateJobsLock.Lock()
+			jobs := loop.immediateJobs
+			loop.immediateJobs = nil
+			loop.immediateJobsLock.Unlock()
+			if len(jobs) == 0 {
+				break
+			}
+			for _, job := range jobs {
+				job()
+			}
+		}
+		if !loop.running || (!inBackground && loop.jobCount <= 0) {
 			break
 		}
-		job()
-	}
-}
-
-func (loop *EventLoop) runInBackground() {
-	loop.running = true
-	for job := range loop.jobChan {
-		job()
-		if !loop.running {
+		select {
+		case job, ok := <-loop.jobChan:
+			if !ok {
+				break L
+			}
+			job()
+		case <-loop.wakeup:
 			break
 		}
 	}
 }
 
-func (loop *EventLoop) addTimeout(f goja.Callable, timeout time.Duration, args []goja.Value) *timer {
-	t := &timer{
-		job: job{Callable: f, args: args},
+func (loop *EventLoop) addImmediateJob(fn func()) {
+	loop.immediateJobsLock.Lock()
+	loop.immediateJobs = append(loop.immediateJobs, fn)
+	loop.immediateJobsLock.Unlock()
+	select {
+	case loop.wakeup <- struct{}{}:
+	default:
 	}
+}
 
+func (loop *EventLoop) addTimeout(f func(), timeout time.Duration) *Timer {
+	t := &Timer{
+		job: job{
+			fn: f,
+		},
+	}
 	t.timer = time.AfterFunc(timeout, func() {
 		loop.jobChan <- func() {
 			loop.doTimeout(t)
 		}
 	})
 
-	loop.jobCount++
 	return t
 }
 
-func (loop *EventLoop) addInterval(f goja.Callable, timeout time.Duration, args []goja.Value) *interval {
-	i := &interval{
-		job:      job{Callable: f, args: args},
+func (loop *EventLoop) addInterval(f func(), timeout time.Duration) *Interval {
+	i := &Interval{
+		job:      job{fn: f},
 		ticker:   time.NewTicker(timeout),
 		stopChan: make(chan struct{}),
 	}
 
 	go i.run(loop)
-	loop.jobCount++
 	return i
 }
 
-func (loop *EventLoop) doTimeout(t *timer) {
+func (loop *EventLoop) doTimeout(t *Timer) {
 	if !t.cancelled {
-		t.Callable(nil, t.args...)
+		t.fn()
 		t.cancelled = true
 		loop.jobCount--
 	}
 }
 
-func (loop *EventLoop) doInterval(i *interval) {
+func (loop *EventLoop) doInterval(i *Interval) {
 	if !i.cancelled {
-		i.Callable(nil, i.args...)
+		i.fn()
 	}
 }
 
-func (loop *EventLoop) clearTimeout(t *timer) {
+func (loop *EventLoop) clearTimeout(t *Timer) {
 	if !t.cancelled {
 		t.timer.Stop()
 		t.cancelled = true
@@ -203,7 +256,7 @@ func (loop *EventLoop) clearTimeout(t *timer) {
 	}
 }
 
-func (loop *EventLoop) clearInterval(i *interval) {
+func (loop *EventLoop) clearInterval(i *Interval) {
 	if !i.cancelled {
 		i.cancelled = true
 		close(i.stopChan)
@@ -211,7 +264,7 @@ func (loop *EventLoop) clearInterval(i *interval) {
 	}
 }
 
-func (i *interval) run(loop *EventLoop) {
+func (i *Interval) run(loop *EventLoop) {
 	for {
 		select {
 		case <-i.stopChan:
