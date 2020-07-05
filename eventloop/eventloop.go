@@ -31,9 +31,9 @@ type EventLoop struct {
 	jobCount int32
 	running  bool
 
-	immediateJobs     []func()
-	immediateJobsLock sync.Mutex
-	wakeup            chan struct{}
+	auxJobs     []func()
+	auxJobsLock sync.Mutex
+	wakeup      chan struct{}
 
 	enableConsole bool
 }
@@ -102,30 +102,47 @@ func (loop *EventLoop) setInterval(call goja.FunctionCall) goja.Value {
 	return loop.schedule(call, true)
 }
 
+// SetTimeout schedules to run the specified function in the context
+// of the loop as soon as possible after the specified timeout period.
+// SetTimeout returns a Timer which can be passed to ClearTimeout.
+// The instance of goja.Runtime that is passed to the function and any Values derived
+// from it must not be used outside of the function. SetTimeout is
+// safe to call inside or outside of the loop.
 func (loop *EventLoop) SetTimeout(fn func(*goja.Runtime), timeout time.Duration) *Timer {
 	t := loop.addTimeout(func() { fn(loop.vm) }, timeout)
-	loop.addImmediateJob(func() {
+	loop.addAuxJob(func() {
 		loop.jobCount++
 	})
 	return t
 }
 
+// ClearTimeout cancels a Timer returned by SetTimeout if it has not run yet.
+// ClearTimeout is safe to call inside or outside of the loop.
 func (loop *EventLoop) ClearTimeout(t *Timer) {
-	loop.addImmediateJob(func() {
+	loop.addAuxJob(func() {
 		loop.clearTimeout(t)
 	})
 }
 
+// SetInterval schedules to repeatedly run the specified function in
+// the context of the loop as soon as possible after every specified
+// timeout period.  SetInterval returns an Interval which can be
+// passed to ClearInterval. The instance of goja.Runtime that is passed to the
+// function and any Values derived from it must not be used outside of
+// the function. SetInterval is safe to call inside or outside of the
+// loop.
 func (loop *EventLoop) SetInterval(fn func(*goja.Runtime), timeout time.Duration) *Interval {
 	i := loop.addInterval(func() { fn(loop.vm) }, timeout)
-	loop.addImmediateJob(func() {
+	loop.addAuxJob(func() {
 		loop.jobCount++
 	})
 	return i
 }
 
+// ClearInterval cancels an Interval returned by SetInterval.
+// ClearInterval is safe to call inside or outside of the loop.
 func (loop *EventLoop) ClearInterval(i *Interval) {
-	loop.addImmediateJob(func() {
+	loop.addAuxJob(func() {
 		loop.clearInterval(i)
 	})
 }
@@ -162,26 +179,21 @@ func (loop *EventLoop) Stop() {
 // RunOnLoop schedules to run the specified function in the context of the loop as soon as possible.
 // The order of the runs is preserved (i.e. the functions will be called in the same order as calls to RunOnLoop())
 // The instance of goja.Runtime that is passed to the function and any Values derived from it must not be used outside
-// of the function.
+// of the function. It is safe to call inside or outside of the loop.
 func (loop *EventLoop) RunOnLoop(fn func(*goja.Runtime)) {
-	loop.addImmediateJob(func() { fn(loop.vm) })
+	loop.addAuxJob(func() { fn(loop.vm) })
 }
 
 func (loop *EventLoop) run(inBackground bool) {
 	loop.running = true
 L:
 	for {
-		for {
-			loop.immediateJobsLock.Lock()
-			jobs := loop.immediateJobs
-			loop.immediateJobs = nil
-			loop.immediateJobsLock.Unlock()
-			if len(jobs) == 0 {
-				break
-			}
-			for _, job := range jobs {
-				job()
-			}
+		loop.auxJobsLock.Lock()
+		jobs := loop.auxJobs
+		loop.auxJobs = nil
+		loop.auxJobsLock.Unlock()
+		for _, job := range jobs {
+			job()
 		}
 		if !loop.running || (!inBackground && loop.jobCount <= 0) {
 			break
@@ -198,10 +210,10 @@ L:
 	}
 }
 
-func (loop *EventLoop) addImmediateJob(fn func()) {
-	loop.immediateJobsLock.Lock()
-	loop.immediateJobs = append(loop.immediateJobs, fn)
-	loop.immediateJobsLock.Unlock()
+func (loop *EventLoop) addAuxJob(fn func()) {
+	loop.auxJobsLock.Lock()
+	loop.auxJobs = append(loop.auxJobs, fn)
+	loop.auxJobsLock.Unlock()
 	select {
 	case loop.wakeup <- struct{}{}:
 	default:
@@ -210,9 +222,7 @@ func (loop *EventLoop) addImmediateJob(fn func()) {
 
 func (loop *EventLoop) addTimeout(f func(), timeout time.Duration) *Timer {
 	t := &Timer{
-		job: job{
-			fn: f,
-		},
+		job: job{fn: f},
 	}
 	t.timer = time.AfterFunc(timeout, func() {
 		loop.jobChan <- func() {
