@@ -184,28 +184,31 @@ func (loop *EventLoop) RunOnLoop(fn func(*goja.Runtime)) {
 	loop.addAuxJob(func() { fn(loop.vm) })
 }
 
+func (loop *EventLoop) runAux() {
+	loop.auxJobsLock.Lock()
+	jobs := loop.auxJobs
+	loop.auxJobs = nil
+	loop.auxJobsLock.Unlock()
+	for _, job := range jobs {
+		job()
+	}
+}
+
 func (loop *EventLoop) run(inBackground bool) {
 	loop.running = true
-L:
-	for {
-		loop.auxJobsLock.Lock()
-		jobs := loop.auxJobs
-		loop.auxJobs = nil
-		loop.auxJobsLock.Unlock()
-		for _, job := range jobs {
-			job()
-		}
-		if !loop.running || (!inBackground && loop.jobCount <= 0) {
-			break
-		}
+	loop.runAux()
+
+	for loop.running && (inBackground || loop.jobCount > 0) {
 		select {
-		case job, ok := <-loop.jobChan:
-			if !ok {
-				break L
-			}
+		case job := <-loop.jobChan:
 			job()
+			select {
+			case <-loop.wakeup:
+				loop.runAux()
+			default:
+			}
 		case <-loop.wakeup:
-			break
+			loop.runAux()
 		}
 	}
 }
