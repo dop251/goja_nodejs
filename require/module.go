@@ -1,6 +1,8 @@
 package require
 
 import (
+	"text/template"
+
 	js "github.com/dop251/goja"
 
 	"errors"
@@ -26,18 +28,49 @@ type Registry struct {
 	native   map[string]ModuleLoader
 	compiled map[string]*js.Program
 
-	srcLoader SourceLoader
+	srcLoader     SourceLoader
+	globalFolders []string
 }
 
 type RequireModule struct {
-	r       *Registry
-	runtime *js.Runtime
-	modules map[string]*js.Object
+	r            *Registry
+	runtime      *js.Runtime
+	modules      map[string]*js.Object
+	resolveStart string
+}
+
+func NewRegistry(opts ...Option) *Registry {
+	r := &Registry{}
+
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r
 }
 
 func NewRegistryWithLoader(srcLoader SourceLoader) *Registry {
-	return &Registry{
-		srcLoader: srcLoader,
+	return NewRegistry(WithLoader(srcLoader))
+}
+
+type Option func(*Registry)
+
+func WithLoader(srcLoader SourceLoader) Option {
+	return func(r *Registry) {
+		r.srcLoader = srcLoader
+	}
+}
+
+// WithGlobalFolders appends the given paths to the registry's list of
+// global folders to search if the requested module is not found
+// elsewhere.  By default, a registry's global folders list is empty.
+// In the reference Node.js implementation, the default global folders
+// list is $NODE_PATH, $HOME/.node_modules, $HOME/.node_libraries and
+// $PREFIX/lib/node, see
+// https://nodejs.org/api/modules.html#modules_loading_from_the_global_folders.
+func WithGlobalFolders(globalFolders ...string) Option {
+	return func(r *Registry) {
+		r.globalFolders = globalFolders
 	}
 }
 
@@ -64,18 +97,28 @@ func (r *Registry) RegisterNativeModule(name string, loader ModuleLoader) {
 	r.native[name] = loader
 }
 
+func (r *Registry) getSource(p string) ([]byte, error) {
+	srcLoader := r.srcLoader
+	if srcLoader == nil {
+		srcLoader = ioutil.ReadFile
+	}
+	return srcLoader(p)
+}
+
 func (r *Registry) getCompiledSource(p string) (prg *js.Program, err error) {
 	r.Lock()
 	defer r.Unlock()
 
 	prg = r.compiled[p]
 	if prg == nil {
-		srcLoader := r.srcLoader
-		if srcLoader == nil {
-			srcLoader = ioutil.ReadFile
-		}
-		if s, err1 := srcLoader(p); err1 == nil {
-			source := "(function(module, exports) {" + string(s) + "\n})"
+		if buf, err1 := r.getSource(p); err1 == nil {
+			s := string(buf)
+
+			if filepath.Ext(p) == ".json" {
+				s = "module.exports = JSON.parse('" + template.JSEscapeString(s) + "')"
+			}
+
+			source := "(function(exports, require, module) {" + string(s) + "\n})"
 			prg, err = js.Compile(p, source, false)
 			if err == nil {
 				if r.compiled == nil {
@@ -114,9 +157,17 @@ func (r *RequireModule) loadModule(path string, jsModule *js.Object) error {
 
 	if call, ok := js.AssertFunction(f); ok {
 		jsExports := jsModule.Get("exports")
+		jsRequire := r.runtime.Get("require")
 
-		// Run the module source, with "jsModule" as the "module" variable, "jsExports" as "this"(Nodejs capable).
-		_, err = call(jsExports, jsModule, jsExports)
+		origResolveStart := r.resolveStart
+		r.resolveStart = filepath.Dir(path)
+		defer func() { r.resolveStart = origResolveStart }()
+
+		// Run the module source, with "jsExports" as "this",
+		// "jsExports" as the "exports" variable, "jsRequire"
+		// as the "require" variable and "jsModule" as the
+		// "module" variable (Nodejs capable).
+		_, err = call(jsExports, jsExports, jsRequire, jsModule)
 		if err != nil {
 			return err
 		}
@@ -141,19 +192,28 @@ func filepathClean(p string) string {
 
 // Require can be used to import modules from Go source (similar to JS require() function).
 func (r *RequireModule) Require(p string) (ret js.Value, err error) {
-	p = filepathClean(p)
-	if p == "" {
-		err = IllegalModuleNameError
+	// TODO: if require() called outside of any other require()
+	// calls, set resolve start path to
+	// filepath.Dir(r.runtime.Program.src.name) (not currently
+	// exposed).
+	if r.resolveStart == "" {
+		r.resolveStart = "."
+		defer func() { r.resolveStart = "" }()
+	}
+
+	path, err := r.resolve(p)
+	if err != nil {
+		err = fmt.Errorf("Could not find module '%s': %v", p, err)
 		return
 	}
-	module := r.modules[p]
+	module := r.modules[path]
 	if module == nil {
 		module = r.runtime.NewObject()
 		module.Set("exports", r.runtime.NewObject())
-		r.modules[p] = module
-		err = r.loadModule(p, module)
+		r.modules[path] = module
+		err = r.loadModule(path, module)
 		if err != nil {
-			delete(r.modules, p)
+			delete(r.modules, path)
 			err = fmt.Errorf("Could not load module '%s': %v", p, err)
 			return
 		}

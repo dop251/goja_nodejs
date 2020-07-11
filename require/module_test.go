@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"testing"
 
 	js "github.com/dop251/goja"
@@ -128,12 +129,12 @@ func TestSourceLoader(t *testing.T) {
 
 	vm := js.New()
 
-	registry := NewRegistryWithLoader(func(name string) ([]byte, error) {
+	registry := NewRegistry(WithGlobalFolders("."), WithLoader(func(name string) ([]byte, error) {
 		if name == "m.js" {
 			return []byte(MODULE), nil
 		}
 		return nil, errors.New("Module does not exist")
-	})
+	}))
 	registry.Enable(vm)
 
 	v, err := vm.RunString(SCRIPT)
@@ -166,12 +167,12 @@ func TestStrictModule(t *testing.T) {
 
 	vm := js.New()
 
-	registry := NewRegistryWithLoader(func(name string) ([]byte, error) {
+	registry := NewRegistry(WithGlobalFolders("."), WithLoader(func(name string) ([]byte, error) {
 		if name == "m.js" {
 			return []byte(MODULE), nil
 		}
 		return nil, errors.New("Module does not exist")
-	})
+	}))
 	registry.Enable(vm)
 
 	v, err := vm.RunString(SCRIPT)
@@ -181,5 +182,107 @@ func TestStrictModule(t *testing.T) {
 
 	if !v.StrictEquals(vm.ToValue("passed1")) {
 		t.Fatalf("Unexpected result: %v", v)
+	}
+}
+
+func TestResolve(t *testing.T) {
+	mapFileSystemSourceLoader := func(files map[string]string) SourceLoader {
+		return func(path string) ([]byte, error) {
+			slashPath := filepath.ToSlash(path)
+			t.Logf("SourceLoader(%s) [%s]", path, slashPath)
+			s, ok := files[filepath.ToSlash(slashPath)]
+			if !ok {
+				return nil, InvalidModuleError
+			}
+			return []byte(s), nil
+		}
+	}
+
+	testRequire := func(src, path string, globalFolders []string, fs map[string]string) (*js.Runtime, js.Value, error) {
+		vm := js.New()
+		r := NewRegistry(WithGlobalFolders(globalFolders...), WithLoader(mapFileSystemSourceLoader(fs)))
+		rr := r.Enable(vm)
+		rr.resolveStart = src
+		t.Logf("Require(%s)", path)
+		ret, err := rr.Require(path)
+		if err != nil {
+			return nil, nil, err
+		}
+		return vm, ret, nil
+	}
+
+	globalFolders := []string{
+		"/usr/lib/node_modules",
+		"/home/src/.node_modules",
+	}
+
+	fs := map[string]string{
+		"/home/src/app/app.js":                   `exports.name = "app"`,
+		"/home/src/app2/app2.json":               `{"name": "app2"}`,
+		"/home/src/app3/index.js":                `exports.name = "app3"`,
+		"/home/src/app4/index.json":              `{"name": "app4"}`,
+		"/home/src/app5/package.json":            `{"main": "app5.js"}`,
+		"/home/src/app5/app5.js":                 `exports.name = "app5"`,
+		"/home/src/app6/package.json":            `{"main": "."}`,
+		"/home/src/app6/index.js":                `exports.name = "app6"`,
+		"/home/src/app7/package.json":            `{"main": "./a/b/c/file.js"}`,
+		"/home/src/app7/a/b/c/file.js":           `exports.name = "app7"`,
+		"/usr/lib/node_modules/app8":             `exports.name = "app8"`,
+		"/home/src/app9/app9.js":                 `exports.name = require('./a/file.js').name`,
+		"/home/src/app9/a/file.js":               `exports.name = require('./b/file.js').name`,
+		"/home/src/app9/a/b/file.js":             `exports.name = require('./c/file.js').name`,
+		"/home/src/app9/a/b/c/file.js":           `exports.name = "app9"`,
+		"/home/src/.node_modules/app10":          `exports.name = "app10"`,
+		"/home/src/app11/a/b/c/app11.js":         `exports.name = require('d/file.js').name`,
+		"/home/src/app11/node_modules/d/file.js": `exports.name = "app11"`,
+		"/app12.js":                              `exports.name = require('a/file.js').name`,
+		"/node_modules/a/file.js":                `exports.name = "app12"`,
+		"/app13/app13.js":                        `exports.name = require('b/file.js').name`,
+		"/node_modules/b/file.js":                `exports.name = "app13"`,
+	}
+
+	for i, tc := range []struct {
+		src   string
+		path  string
+		ok    bool
+		field string
+		value string
+	}{
+		{"/home/src", "./app/app", true, "name", "app"},
+		{"/home/src", "./app/app.js", true, "name", "app"},
+		{"/home/src", "./app/bad.js", false, "", ""},
+		{"/home/src", "./app2/app2", true, "name", "app2"},
+		{"/home/src", "./app2/app2.json", true, "name", "app2"},
+		{"/home/src", "./app/bad.json", false, "", ""},
+		{"/home/src", "./app3", true, "name", "app3"},
+		{"/home/src", "./appbad", false, "", ""},
+		{"/home/src", "./app4", true, "name", "app4"},
+		{"/home/src", "./appbad", false, "", ""},
+		{"/home/src", "./app5", true, "name", "app5"},
+		{"/home/src", "./app6", true, "name", "app6"},
+		{"/home/src", "./app7", true, "name", "app7"},
+		{"/home/src", "app8", true, "name", "app8"},
+		{"/home/src", "./app9/app9", true, "name", "app9"},
+		{"/home/src", "app10", true, "name", "app10"},
+		{"/home/src", "./app11/a/b/c/app11.js", true, "name", "app11"},
+		{"/", "./app12", true, "name", "app12"},
+		{"/", "./app13/app13", true, "name", "app13"},
+	} {
+		vm, mod, err := testRequire(tc.src, tc.path, globalFolders, fs)
+		if err != nil {
+			if tc.ok {
+				t.Errorf("%v: require() failed: %v", i, err)
+			}
+			continue
+		}
+		f := mod.ToObject(vm).Get(tc.field)
+		if f == nil {
+			t.Errorf("%v: field %q not found", i, tc.field)
+			continue
+		}
+		value := f.String()
+		if value != tc.value {
+			t.Errorf("%v: got %q expected %q", i, value, tc.value)
+		}
 	}
 }
