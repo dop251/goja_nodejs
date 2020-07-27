@@ -29,10 +29,10 @@ func (r *RequireModule) resolve(path string) (module *js.Object, err error) {
 		start = r.getCurrentModulePath()
 	}
 
+	p := filepath.Join(start, path)
 	if strings.HasPrefix(origPath, "./") ||
 		strings.HasPrefix(origPath, "/") || strings.HasPrefix(origPath, "../") ||
 		origPath == "." || origPath == ".." {
-		p := filepath.Join(start, path)
 		if module = r.modules[p]; module != nil {
 			return
 		}
@@ -41,7 +41,6 @@ func (r *RequireModule) resolve(path string) (module *js.Object, err error) {
 			r.modules[p] = module
 		}
 	} else {
-		p := filepath.Join(start, path)
 		if module = r.nodeModules[p]; module != nil {
 			return
 		}
@@ -140,7 +139,7 @@ func (r *RequireModule) loadNodeModules(path, start string) (module *js.Object, 
 			return
 		}
 	}
-	for ; start != ""; start = filepath.Dir(start) {
+	for {
 		var p string
 		if filepath.Base(start) != "node_modules" {
 			p = filepath.Join(start, "node_modules")
@@ -150,6 +149,14 @@ func (r *RequireModule) loadNodeModules(path, start string) (module *js.Object, 
 		if module, err = r.loadNodeModule(path, p); err == nil {
 			return
 		}
+		if start == ".." { // Dir('..') is '.'
+			break
+		}
+		parent := filepath.Dir(start)
+		if parent == start {
+			break
+		}
+		start = parent
 	}
 
 	return nil, InvalidModuleError

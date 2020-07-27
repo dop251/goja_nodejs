@@ -239,6 +239,8 @@ func TestResolve(t *testing.T) {
 		"/node_modules/a/file.js":                `exports.name = "app12"`,
 		"/app13/app13.js":                        `exports.name = require('b/file.js').name`,
 		"/node_modules/b/file.js":                `exports.name = "app13"`,
+		"node_modules/app14/index.js":            `exports.name = "app14"`,
+		"../node_modules/app15/index.js":         `exports.name = "app15"`,
 	}
 
 	for i, tc := range []struct {
@@ -268,13 +270,20 @@ func TestResolve(t *testing.T) {
 		{"/home/src", "./app11/a/b/c/app11.js", true, "name", "app11"},
 		{"/", "./app12", true, "name", "app12"},
 		{"/", "./app13/app13", true, "name", "app13"},
+		{".", "app14", true, "name", "app14"},
+		{"..", "nonexistent", false, "", ""},
 	} {
 		vm, mod, err := testRequire(tc.src, tc.path, globalFolders, fs)
 		if err != nil {
 			if tc.ok {
-				t.Errorf("%v: require() failed: %v", i, err)
+				t.Errorf("%d: require() failed: %v", i, err)
 			}
 			continue
+		} else {
+			if !tc.ok {
+				t.Errorf("%d: expected to fail, but did not", i)
+				continue
+			}
 		}
 		f := mod.ToObject(vm).Get(tc.field)
 		if f == nil {
