@@ -1,15 +1,13 @@
 package require
 
 import (
-	"text/template"
-
-	js "github.com/dop251/goja"
-
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"sync"
+	"text/template"
+
+	js "github.com/dop251/goja"
 )
 
 type ModuleLoader func(*js.Runtime, *js.Object)
@@ -33,10 +31,10 @@ type Registry struct {
 }
 
 type RequireModule struct {
-	r            *Registry
-	runtime      *js.Runtime
-	modules      map[string]*js.Object
-	resolveStart string
+	r           *Registry
+	runtime     *js.Runtime
+	modules     map[string]*js.Object
+	nodeModules map[string]*js.Object
 }
 
 func NewRegistry(opts ...Option) *Registry {
@@ -77,9 +75,10 @@ func WithGlobalFolders(globalFolders ...string) Option {
 // Enable adds the require() function to the specified runtime.
 func (r *Registry) Enable(runtime *js.Runtime) *RequireModule {
 	rrt := &RequireModule{
-		r:       r,
-		runtime: runtime,
-		modules: make(map[string]*js.Object),
+		r:           r,
+		runtime:     runtime,
+		modules:     make(map[string]*js.Object),
+		nodeModules: make(map[string]*js.Object),
 	}
 
 	runtime.Set("require", rrt.require)
@@ -118,7 +117,7 @@ func (r *Registry) getCompiledSource(p string) (prg *js.Program, err error) {
 				s = "module.exports = JSON.parse('" + template.JSEscapeString(s) + "')"
 			}
 
-			source := "(function(exports, require, module) {" + string(s) + "\n})"
+			source := "(function(exports, require, module) {" + s + "\n})"
 			prg, err = js.Compile(p, source, false)
 			if err == nil {
 				if r.compiled == nil {
@@ -131,51 +130,6 @@ func (r *Registry) getCompiledSource(p string) (prg *js.Program, err error) {
 		}
 	}
 	return
-}
-
-func (r *RequireModule) loadModule(path string, jsModule *js.Object) error {
-	if ldr, exists := r.r.native[path]; exists {
-		ldr(r.runtime, jsModule)
-		return nil
-	}
-
-	if ldr, exists := native[path]; exists {
-		ldr(r.runtime, jsModule)
-		return nil
-	}
-
-	prg, err := r.r.getCompiledSource(path)
-
-	if err != nil {
-		return err
-	}
-
-	f, err := r.runtime.RunProgram(prg)
-	if err != nil {
-		return err
-	}
-
-	if call, ok := js.AssertFunction(f); ok {
-		jsExports := jsModule.Get("exports")
-		jsRequire := r.runtime.Get("require")
-
-		origResolveStart := r.resolveStart
-		r.resolveStart = filepath.Dir(path)
-		defer func() { r.resolveStart = origResolveStart }()
-
-		// Run the module source, with "jsExports" as "this",
-		// "jsExports" as the "exports" variable, "jsRequire"
-		// as the "require" variable and "jsModule" as the
-		// "module" variable (Nodejs capable).
-		_, err = call(jsExports, jsExports, jsRequire, jsModule)
-		if err != nil {
-			return err
-		}
-	} else {
-		return InvalidModuleError
-	}
-
-	return nil
 }
 
 func (r *RequireModule) require(call js.FunctionCall) js.Value {
@@ -192,31 +146,9 @@ func filepathClean(p string) string {
 
 // Require can be used to import modules from Go source (similar to JS require() function).
 func (r *RequireModule) Require(p string) (ret js.Value, err error) {
-	// TODO: if require() called outside of any other require()
-	// calls, set resolve start path to
-	// filepath.Dir(r.runtime.Program.src.name) (not currently
-	// exposed).
-	if r.resolveStart == "" {
-		r.resolveStart = "."
-		defer func() { r.resolveStart = "" }()
-	}
-
-	path, err := r.resolve(p)
+	module, err := r.resolve(p)
 	if err != nil {
-		err = fmt.Errorf("Could not find module '%s': %v", p, err)
 		return
-	}
-	module := r.modules[path]
-	if module == nil {
-		module = r.runtime.NewObject()
-		module.Set("exports", r.runtime.NewObject())
-		r.modules[path] = module
-		err = r.loadModule(path, module)
-		if err != nil {
-			delete(r.modules, path)
-			err = fmt.Errorf("Could not load module '%s': %v", p, err)
-			return
-		}
 	}
 	ret = module.Get("exports")
 	return

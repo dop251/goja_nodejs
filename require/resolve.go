@@ -4,106 +4,111 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"strings"
+
+	js "github.com/dop251/goja"
 )
 
 // NodeJS module search algorithm described by
 // https://nodejs.org/api/modules.html#modules_all_together
-func (r *RequireModule) resolve(path string) (resolvedPath string, err error) {
+func (r *RequireModule) resolve(path string) (module *js.Object, err error) {
 	origPath, path := path, filepathClean(path)
 	if path == "" {
-		return "", IllegalModuleNameError
+		return nil, IllegalModuleNameError
 	}
 
-	resolvedPath, err = r.loadNative(path)
+	module, err = r.loadNative(path)
 	if err == nil {
-		return resolvedPath, nil
+		return
 	}
 
-	start := r.resolveStart
+	var start string
+	err = nil
 	if strings.HasPrefix(origPath, "/") {
 		start = "/"
+	} else {
+		start = r.getCurrentModulePath()
 	}
 
 	if strings.HasPrefix(origPath, "./") ||
 		strings.HasPrefix(origPath, "/") || strings.HasPrefix(origPath, "../") ||
 		origPath == "." || origPath == ".." {
 		p := filepath.Join(start, path)
-		resolvedPath, err = r.loadAsFileOrDirectory(p)
-		if err == nil {
-			return resolvedPath, nil
+		if module = r.modules[p]; module != nil {
+			return
 		}
-		return "", InvalidModuleError
+		module, err = r.loadAsFileOrDirectory(p)
+		if err == nil {
+			r.modules[p] = module
+		}
+	} else {
+		p := filepath.Join(start, path)
+		if module = r.nodeModules[p]; module != nil {
+			return
+		}
+		module, err = r.loadNodeModules(path, start)
+		if err == nil {
+			r.nodeModules[p] = module
+		}
 	}
 
-	p := filepath.Dir(start)
-	resolvedPath, err = r.loadNodeModules(path, p)
-	if err == nil {
-		return resolvedPath, nil
-	}
-
-	return "", InvalidModuleError
+	return
 }
 
-func (r *RequireModule) loadNative(path string) (string, error) {
-	path = filepathClean(path)
-	if _, exists := r.r.native[path]; exists {
-		return path, nil
+func (r *RequireModule) loadNative(path string) (*js.Object, error) {
+	module := r.modules[path]
+	if module != nil {
+		return module, nil
 	}
-	if _, exists := native[path]; exists {
-		return path, nil
+
+	var ldr ModuleLoader
+	if ldr = r.r.native[path]; ldr == nil {
+		ldr = native[path]
 	}
-	return "", InvalidModuleError
+
+	if ldr != nil {
+		module = r.createModuleObject()
+		r.modules[path] = module
+		ldr(r.runtime, module)
+		return module, nil
+	}
+
+	return nil, InvalidModuleError
 }
 
-func (r *RequireModule) loadAsFileOrDirectory(path string) (string, error) {
-	path = filepathClean(path)
-	resolvedPath, err := r.loadAsFile(path)
+func (r *RequireModule) loadAsFileOrDirectory(path string) (module *js.Object, err error) {
+	module, err = r.loadAsFile(path)
 	if err == nil {
-		return resolvedPath, nil
+		return
 	}
-	resolvedPath, err = r.loadAsDirectory(path)
-	if err == nil {
-		return resolvedPath, nil
-	}
-	return "", InvalidModuleError
+
+	return r.loadAsDirectory(path)
 }
 
-func (r *RequireModule) loadAsFile(path string) (string, error) {
-	path = filepathClean(path)
-	_, err := r.r.getSource(path)
-	if err == nil {
-		return path, nil
+func (r *RequireModule) loadAsFile(path string) (module *js.Object, err error) {
+	if module, err = r.loadModule(path); err == nil {
+		return
 	}
+
 	p := path + ".js"
-	_, err = r.r.getSource(p)
-	if err == nil {
-		return p, nil
+	if module, err = r.loadModule(p); err == nil {
+		return
 	}
+
 	p = path + ".json"
-	_, err = r.r.getSource(p)
-	if err == nil {
-		return p, nil
-	}
-	return "", InvalidModuleError
+	return r.loadModule(p)
 }
 
-func (r *RequireModule) loadIndex(path string) (string, error) {
-	path = filepathClean(path)
+func (r *RequireModule) loadIndex(path string) (module *js.Object, err error) {
 	p := filepath.Join(path, "index.js")
-	_, err := r.r.getSource(p)
-	if err == nil {
-		return p, nil
+	if module, err = r.loadModule(p); err == nil {
+		return
 	}
+
 	p = filepath.Join(path, "index.json")
-	_, err = r.r.getSource(p)
-	if err == nil {
-		return p, nil
-	}
-	return "", InvalidModuleError
+	return r.loadModule(p)
 }
 
-func (r *RequireModule) loadAsDirectory(path string) (string, error) {
-	path = filepathClean(path)
+func (r *RequireModule) loadAsDirectory(path string) (module *js.Object, err error) {
 	p := filepath.Join(path, "package.json")
 	buf, err := r.r.getSource(p)
 	if err != nil {
@@ -116,41 +121,98 @@ func (r *RequireModule) loadAsDirectory(path string) (string, error) {
 	if err != nil || len(pkg.Main) == 0 {
 		return r.loadIndex(path)
 	}
+
 	m := filepath.Join(path, pkg.Main)
-	resolvedPath, err := r.loadAsFile(m)
-	if err == nil {
-		return resolvedPath, nil
+	if module, err = r.loadAsFile(m); err == nil {
+		return
 	}
-	resolvedPath, err = r.loadIndex(m)
-	if err == nil {
-		return resolvedPath, nil
-	}
-	return "", InvalidModuleError
+
+	return r.loadIndex(m)
 }
 
-func (r *RequireModule) loadNodeModules(path, start string) (string, error) {
-	dirs, err := r.nodeModulesPaths(start)
+func (r *RequireModule) loadNodeModule(path, start string) (*js.Object, error) {
+	return r.loadAsFileOrDirectory(filepath.Join(start, path))
+}
+
+func (r *RequireModule) loadNodeModules(path, start string) (module *js.Object, err error) {
+	for _, dir := range r.r.globalFolders {
+		if module, err = r.loadNodeModule(path, dir); err == nil {
+			return
+		}
+	}
+	for ; start != ""; start = filepath.Dir(start) {
+		var p string
+		if filepath.Base(start) != "node_modules" {
+			p = filepath.Join(start, "node_modules")
+		} else {
+			p = start
+		}
+		if module, err = r.loadNodeModule(path, p); err == nil {
+			return
+		}
+	}
+
+	return nil, InvalidModuleError
+}
+
+func (r *RequireModule) getCurrentModulePath() string {
+	var buf [2]js.StackFrame
+	frames := r.runtime.CaptureCallStack(2, buf[:0])
+	if len(frames) < 2 {
+		return "."
+	}
+	return filepath.Dir(frames[1].SrcName())
+}
+
+func (r *RequireModule) createModuleObject() *js.Object {
+	module := r.runtime.NewObject()
+	module.Set("exports", r.runtime.NewObject())
+	return module
+}
+
+func (r *RequireModule) loadModule(path string) (*js.Object, error) {
+	module := r.modules[path]
+	if module == nil {
+		module = r.createModuleObject()
+		r.modules[path] = module
+		err := r.loadModuleFile(path, module)
+		if err != nil {
+			module = nil
+			delete(r.modules, path)
+		}
+		return module, err
+	}
+	return module, nil
+}
+
+func (r *RequireModule) loadModuleFile(path string, jsModule *js.Object) error {
+
+	prg, err := r.r.getCompiledSource(path)
+
 	if err != nil {
-		return "", err
+		return err
 	}
-	for _, dir := range dirs {
-		p := filepath.Join(dir, path)
-		resolvedPath, err := r.loadAsFileOrDirectory(p)
-		if err == nil {
-			return resolvedPath, nil
-		}
-	}
-	return "", InvalidModuleError
-}
 
-func (r *RequireModule) nodeModulesPaths(start string) ([]string, error) {
-	dirs := r.r.globalFolders
-	prev, dir := "", filepath.Dir(start)
-	for prev != dir {
-		if filepath.Base(dir) != "node_modules" {
-			dirs = append(dirs, filepath.Join(dir, "node_modules"))
-		}
-		prev, dir = dir, filepath.Dir(dir)
+	f, err := r.runtime.RunProgram(prg)
+	if err != nil {
+		return err
 	}
-	return dirs, nil
+
+	if call, ok := js.AssertFunction(f); ok {
+		jsExports := jsModule.Get("exports")
+		jsRequire := r.runtime.Get("require")
+
+		// Run the module source, with "jsExports" as "this",
+		// "jsExports" as the "exports" variable, "jsRequire"
+		// as the "require" variable and "jsModule" as the
+		// "module" variable (Nodejs capable).
+		_, err = call(jsExports, jsExports, jsRequire, jsModule)
+		if err != nil {
+			return err
+		}
+	} else {
+		return InvalidModuleError
+	}
+
+	return nil
 }

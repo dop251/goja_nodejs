@@ -11,6 +11,18 @@ import (
 	js "github.com/dop251/goja"
 )
 
+func mapFileSystemSourceLoader(files map[string]string, t *testing.T) SourceLoader {
+	return func(path string) ([]byte, error) {
+		slashPath := filepath.ToSlash(path)
+		t.Logf("SourceLoader(%s) [%s]", path, slashPath)
+		s, ok := files[filepath.ToSlash(slashPath)]
+		if !ok {
+			return nil, InvalidModuleError
+		}
+		return []byte(s), nil
+	}
+}
+
 func TestRequireNativeModule(t *testing.T) {
 	const SCRIPT = `
 	var m = require("test/m");
@@ -49,7 +61,7 @@ func TestRequireRegistryNativeModule(t *testing.T) {
 		return func(vm *js.Runtime, module *js.Object) {
 			o := module.Get("exports").(*js.Object)
 			o.Set("print", func(call js.FunctionCall) js.Value {
-				fmt.Fprint(w, prefix, call.Argument(0).ToString())
+				fmt.Fprint(w, prefix, call.Argument(0).String())
 				return js.Undefined()
 			})
 		}
@@ -186,25 +198,12 @@ func TestStrictModule(t *testing.T) {
 }
 
 func TestResolve(t *testing.T) {
-	mapFileSystemSourceLoader := func(files map[string]string) SourceLoader {
-		return func(path string) ([]byte, error) {
-			slashPath := filepath.ToSlash(path)
-			t.Logf("SourceLoader(%s) [%s]", path, slashPath)
-			s, ok := files[filepath.ToSlash(slashPath)]
-			if !ok {
-				return nil, InvalidModuleError
-			}
-			return []byte(s), nil
-		}
-	}
-
 	testRequire := func(src, path string, globalFolders []string, fs map[string]string) (*js.Runtime, js.Value, error) {
 		vm := js.New()
-		r := NewRegistry(WithGlobalFolders(globalFolders...), WithLoader(mapFileSystemSourceLoader(fs)))
-		rr := r.Enable(vm)
-		rr.resolveStart = src
+		r := NewRegistry(WithGlobalFolders(globalFolders...), WithLoader(mapFileSystemSourceLoader(fs, t)))
+		r.Enable(vm)
 		t.Logf("Require(%s)", path)
-		ret, err := rr.Require(path)
+		ret, err := vm.RunScript(filepath.Join(src, "test.js"), fmt.Sprintf("require('%s')", path))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -233,6 +232,7 @@ func TestResolve(t *testing.T) {
 		"/home/src/app9/a/b/file.js":             `exports.name = require('./c/file.js').name`,
 		"/home/src/app9/a/b/c/file.js":           `exports.name = "app9"`,
 		"/home/src/.node_modules/app10":          `exports.name = "app10"`,
+		"/home/src/app11/app11.js":               `exports.name = require('d/file.js').name`,
 		"/home/src/app11/a/b/c/app11.js":         `exports.name = require('d/file.js').name`,
 		"/home/src/app11/node_modules/d/file.js": `exports.name = "app11"`,
 		"/app12.js":                              `exports.name = require('a/file.js').name`,
@@ -264,6 +264,7 @@ func TestResolve(t *testing.T) {
 		{"/home/src", "app8", true, "name", "app8"},
 		{"/home/src", "./app9/app9", true, "name", "app9"},
 		{"/home/src", "app10", true, "name", "app10"},
+		{"/home/src", "./app11/app11.js", true, "name", "app11"},
 		{"/home/src", "./app11/a/b/c/app11.js", true, "name", "app11"},
 		{"/", "./app12", true, "name", "app12"},
 		{"/", "./app13/app13", true, "name", "app13"},
@@ -284,5 +285,25 @@ func TestResolve(t *testing.T) {
 		if value != tc.value {
 			t.Errorf("%v: got %q expected %q", i, value, tc.value)
 		}
+	}
+}
+
+func TestRequireCycle(t *testing.T) {
+	vm := js.New()
+	r := NewRegistry(WithLoader(mapFileSystemSourceLoader(map[string]string{
+		"a.js": `var b = require('./b.js'); exports.done = true;`,
+		"b.js": `var a = require('./a.js'); exports.done = true;`,
+	}, t)))
+	r.Enable(vm)
+	res, err := vm.RunString(`
+	var a = require('./a.js');
+	var b = require('./b.js');
+	a.done && b.done;
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := res.Export(); v != true {
+		t.Fatalf("Unexpected result: %v", v)
 	}
 }
