@@ -3,19 +3,27 @@ package require
 import (
 	"errors"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"text/template"
 
 	js "github.com/dop251/goja"
 )
 
 type ModuleLoader func(*js.Runtime, *js.Object)
+
+// SourceLoader represents a function that returns a file data at a given path.
+// The function should return ModuleFileDoesNotExistError if the file either doesn't exist or is a directory.
+// This error will be ignored by the resolver and the search will continue. Any other errors will be propagated.
 type SourceLoader func(path string) ([]byte, error)
 
 var (
 	InvalidModuleError     = errors.New("Invalid module")
 	IllegalModuleNameError = errors.New("Illegal module name")
+
+	ModuleFileDoesNotExistError = errors.New("module file does not exist")
 )
 
 var native map[string]ModuleLoader
@@ -96,10 +104,21 @@ func (r *Registry) RegisterNativeModule(name string, loader ModuleLoader) {
 	r.native[name] = loader
 }
 
+// DefaultSourceLoader is used if none was set (see WithLoader()). It simply loads files from the host's filesystem.
+func DefaultSourceLoader(filename string) ([]byte, error) {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		if os.IsNotExist(err) || errors.Is(err, syscall.EISDIR) {
+			err = ModuleFileDoesNotExistError
+		}
+	}
+	return data, err
+}
+
 func (r *Registry) getSource(p string) ([]byte, error) {
 	srcLoader := r.srcLoader
 	if srcLoader == nil {
-		srcLoader = ioutil.ReadFile
+		srcLoader = DefaultSourceLoader
 	}
 	return srcLoader(p)
 }
@@ -135,7 +154,10 @@ func (r *Registry) getCompiledSource(p string) (prg *js.Program, err error) {
 func (r *RequireModule) require(call js.FunctionCall) js.Value {
 	ret, err := r.Require(call.Argument(0).String())
 	if err != nil {
-		panic(r.runtime.NewGoError(err))
+		if _, ok := err.(*js.Exception); !ok {
+			panic(r.runtime.NewGoError(err))
+		}
+		panic(err)
 	}
 	return ret
 }

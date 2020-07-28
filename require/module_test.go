@@ -17,7 +17,7 @@ func mapFileSystemSourceLoader(files map[string]string, t *testing.T) SourceLoad
 		t.Logf("SourceLoader(%s) [%s]", path, slashPath)
 		s, ok := files[filepath.ToSlash(slashPath)]
 		if !ok {
-			return nil, InvalidModuleError
+			return nil, ModuleFileDoesNotExistError
 		}
 		return []byte(s), nil
 	}
@@ -314,5 +314,24 @@ func TestRequireCycle(t *testing.T) {
 	}
 	if v := res.Export(); v != true {
 		t.Fatalf("Unexpected result: %v", v)
+	}
+}
+
+func TestErrorPropagation(t *testing.T) {
+	vm := js.New()
+	r := NewRegistry(WithLoader(mapFileSystemSourceLoader(map[string]string{
+		"m.js": `throw 'test passed';`,
+	}, t)))
+	rr := r.Enable(vm)
+	_, err := rr.Require("./m")
+	if err == nil {
+		t.Fatal("Expected an error")
+	}
+	if ex, ok := err.(*js.Exception); ok {
+		if !ex.Value().StrictEquals(vm.ToValue("test passed")) {
+			t.Fatalf("Unexpected Exception: %v", ex)
+		}
+	} else {
+		t.Fatal(err)
 	}
 }

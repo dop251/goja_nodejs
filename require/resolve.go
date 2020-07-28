@@ -2,6 +2,7 @@ package require
 
 import (
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"strings"
 
@@ -37,7 +38,7 @@ func (r *RequireModule) resolve(path string) (module *js.Object, err error) {
 			return
 		}
 		module, err = r.loadAsFileOrDirectory(p)
-		if err == nil {
+		if err == nil && module != nil {
 			r.modules[p] = module
 		}
 	} else {
@@ -45,11 +46,14 @@ func (r *RequireModule) resolve(path string) (module *js.Object, err error) {
 			return
 		}
 		module, err = r.loadNodeModules(path, start)
-		if err == nil {
+		if err == nil && module != nil {
 			r.nodeModules[p] = module
 		}
 	}
 
+	if module == nil && err == nil {
+		err = InvalidModuleError
+	}
 	return
 }
 
@@ -75,8 +79,7 @@ func (r *RequireModule) loadNative(path string) (*js.Object, error) {
 }
 
 func (r *RequireModule) loadAsFileOrDirectory(path string) (module *js.Object, err error) {
-	module, err = r.loadAsFile(path)
-	if err == nil {
+	if module, err = r.loadAsFile(path); module != nil || err != nil {
 		return
 	}
 
@@ -84,12 +87,12 @@ func (r *RequireModule) loadAsFileOrDirectory(path string) (module *js.Object, e
 }
 
 func (r *RequireModule) loadAsFile(path string) (module *js.Object, err error) {
-	if module, err = r.loadModule(path); err == nil {
+	if module, err = r.loadModule(path); module != nil || err != nil {
 		return
 	}
 
 	p := path + ".js"
-	if module, err = r.loadModule(p); err == nil {
+	if module, err = r.loadModule(p); module != nil || err != nil {
 		return
 	}
 
@@ -99,7 +102,7 @@ func (r *RequireModule) loadAsFile(path string) (module *js.Object, err error) {
 
 func (r *RequireModule) loadIndex(path string) (module *js.Object, err error) {
 	p := filepath.Join(path, "index.js")
-	if module, err = r.loadModule(p); err == nil {
+	if module, err = r.loadModule(p); module != nil || err != nil {
 		return
 	}
 
@@ -122,7 +125,7 @@ func (r *RequireModule) loadAsDirectory(path string) (module *js.Object, err err
 	}
 
 	m := filepath.Join(path, pkg.Main)
-	if module, err = r.loadAsFile(m); err == nil {
+	if module, err = r.loadAsFile(m); module != nil || err != nil {
 		return
 	}
 
@@ -135,7 +138,7 @@ func (r *RequireModule) loadNodeModule(path, start string) (*js.Object, error) {
 
 func (r *RequireModule) loadNodeModules(path, start string) (module *js.Object, err error) {
 	for _, dir := range r.r.globalFolders {
-		if module, err = r.loadNodeModule(path, dir); err == nil {
+		if module, err = r.loadNodeModule(path, dir); module != nil || err != nil {
 			return
 		}
 	}
@@ -146,7 +149,7 @@ func (r *RequireModule) loadNodeModules(path, start string) (module *js.Object, 
 		} else {
 			p = start
 		}
-		if module, err = r.loadNodeModule(path, p); err == nil {
+		if module, err = r.loadNodeModule(path, p); module != nil || err != nil {
 			return
 		}
 		if start == ".." { // Dir('..') is '.'
@@ -186,6 +189,9 @@ func (r *RequireModule) loadModule(path string) (*js.Object, error) {
 		if err != nil {
 			module = nil
 			delete(r.modules, path)
+			if errors.Is(err, ModuleFileDoesNotExistError) {
+				err = nil
+			}
 		}
 		return module, err
 	}
