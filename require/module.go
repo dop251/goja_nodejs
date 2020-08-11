@@ -1,21 +1,29 @@
 package require
 
 import (
-	js "github.com/dop251/goja"
-
 	"errors"
-	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
+	"text/template"
+
+	js "github.com/dop251/goja"
 )
 
 type ModuleLoader func(*js.Runtime, *js.Object)
+
+// SourceLoader represents a function that returns a file data at a given path.
+// The function should return ModuleFileDoesNotExistError if the file either doesn't exist or is a directory.
+// This error will be ignored by the resolver and the search will continue. Any other errors will be propagated.
 type SourceLoader func(path string) ([]byte, error)
 
 var (
 	InvalidModuleError     = errors.New("Invalid module")
 	IllegalModuleNameError = errors.New("Illegal module name")
+
+	ModuleFileDoesNotExistError = errors.New("module file does not exist")
 )
 
 var native map[string]ModuleLoader
@@ -26,27 +34,59 @@ type Registry struct {
 	native   map[string]ModuleLoader
 	compiled map[string]*js.Program
 
-	srcLoader SourceLoader
+	srcLoader     SourceLoader
+	globalFolders []string
 }
 
 type RequireModule struct {
-	r       *Registry
-	runtime *js.Runtime
-	modules map[string]*js.Object
+	r           *Registry
+	runtime     *js.Runtime
+	modules     map[string]*js.Object
+	nodeModules map[string]*js.Object
+}
+
+func NewRegistry(opts ...Option) *Registry {
+	r := &Registry{}
+
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r
 }
 
 func NewRegistryWithLoader(srcLoader SourceLoader) *Registry {
-	return &Registry{
-		srcLoader: srcLoader,
+	return NewRegistry(WithLoader(srcLoader))
+}
+
+type Option func(*Registry)
+
+func WithLoader(srcLoader SourceLoader) Option {
+	return func(r *Registry) {
+		r.srcLoader = srcLoader
+	}
+}
+
+// WithGlobalFolders appends the given paths to the registry's list of
+// global folders to search if the requested module is not found
+// elsewhere.  By default, a registry's global folders list is empty.
+// In the reference Node.js implementation, the default global folders
+// list is $NODE_PATH, $HOME/.node_modules, $HOME/.node_libraries and
+// $PREFIX/lib/node, see
+// https://nodejs.org/api/modules.html#modules_loading_from_the_global_folders.
+func WithGlobalFolders(globalFolders ...string) Option {
+	return func(r *Registry) {
+		r.globalFolders = globalFolders
 	}
 }
 
 // Enable adds the require() function to the specified runtime.
 func (r *Registry) Enable(runtime *js.Runtime) *RequireModule {
 	rrt := &RequireModule{
-		r:       r,
-		runtime: runtime,
-		modules: make(map[string]*js.Object),
+		r:           r,
+		runtime:     runtime,
+		modules:     make(map[string]*js.Object),
+		nodeModules: make(map[string]*js.Object),
 	}
 
 	runtime.Set("require", rrt.require)
@@ -64,18 +104,39 @@ func (r *Registry) RegisterNativeModule(name string, loader ModuleLoader) {
 	r.native[name] = loader
 }
 
+// DefaultSourceLoader is used if none was set (see WithLoader()). It simply loads files from the host's filesystem.
+func DefaultSourceLoader(filename string) ([]byte, error) {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		if os.IsNotExist(err) || errors.Is(err, syscall.EISDIR) {
+			err = ModuleFileDoesNotExistError
+		}
+	}
+	return data, err
+}
+
+func (r *Registry) getSource(p string) ([]byte, error) {
+	srcLoader := r.srcLoader
+	if srcLoader == nil {
+		srcLoader = DefaultSourceLoader
+	}
+	return srcLoader(p)
+}
+
 func (r *Registry) getCompiledSource(p string) (prg *js.Program, err error) {
 	r.Lock()
 	defer r.Unlock()
 
 	prg = r.compiled[p]
 	if prg == nil {
-		srcLoader := r.srcLoader
-		if srcLoader == nil {
-			srcLoader = ioutil.ReadFile
-		}
-		if s, err1 := srcLoader(p); err1 == nil {
-			source := "(function(module, exports) {" + string(s) + "\n})"
+		if buf, err1 := r.getSource(p); err1 == nil {
+			s := string(buf)
+
+			if filepath.Ext(p) == ".json" {
+				s = "module.exports = JSON.parse('" + template.JSEscapeString(s) + "')"
+			}
+
+			source := "(function(exports, require, module) {" + s + "\n})"
 			prg, err = js.Compile(p, source, false)
 			if err == nil {
 				if r.compiled == nil {
@@ -90,47 +151,13 @@ func (r *Registry) getCompiledSource(p string) (prg *js.Program, err error) {
 	return
 }
 
-func (r *RequireModule) loadModule(path string, jsModule *js.Object) error {
-	if ldr, exists := r.r.native[path]; exists {
-		ldr(r.runtime, jsModule)
-		return nil
-	}
-
-	if ldr, exists := native[path]; exists {
-		ldr(r.runtime, jsModule)
-		return nil
-	}
-
-	prg, err := r.r.getCompiledSource(path)
-
-	if err != nil {
-		return err
-	}
-
-	f, err := r.runtime.RunProgram(prg)
-	if err != nil {
-		return err
-	}
-
-	if call, ok := js.AssertFunction(f); ok {
-		jsExports := jsModule.Get("exports")
-
-		// Run the module source, with "jsModule" as the "module" variable, "jsExports" as "this"(Nodejs capable).
-		_, err = call(jsExports, jsModule, jsExports)
-		if err != nil {
-			return err
-		}
-	} else {
-		return InvalidModuleError
-	}
-
-	return nil
-}
-
 func (r *RequireModule) require(call js.FunctionCall) js.Value {
 	ret, err := r.Require(call.Argument(0).String())
 	if err != nil {
-		panic(r.runtime.NewGoError(err))
+		if _, ok := err.(*js.Exception); !ok {
+			panic(r.runtime.NewGoError(err))
+		}
+		panic(err)
 	}
 	return ret
 }
@@ -141,22 +168,9 @@ func filepathClean(p string) string {
 
 // Require can be used to import modules from Go source (similar to JS require() function).
 func (r *RequireModule) Require(p string) (ret js.Value, err error) {
-	p = filepathClean(p)
-	if p == "" {
-		err = IllegalModuleNameError
+	module, err := r.resolve(p)
+	if err != nil {
 		return
-	}
-	module := r.modules[p]
-	if module == nil {
-		module = r.runtime.NewObject()
-		module.Set("exports", r.runtime.NewObject())
-		r.modules[p] = module
-		err = r.loadModule(p, module)
-		if err != nil {
-			delete(r.modules, p)
-			err = fmt.Errorf("Could not load module '%s': %v", p, err)
-			return
-		}
 	}
 	ret = module.Get("exports")
 	return
