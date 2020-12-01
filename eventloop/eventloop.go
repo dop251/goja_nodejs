@@ -304,11 +304,12 @@ func (loop *EventLoop) clearInterval(i *Interval) {
 }
 
 func (i *Interval) run(loop *EventLoop) {
+L:
 	for {
 		select {
 		case <-i.stopChan:
 			i.ticker.Stop()
-			break
+			break L
 		case <-i.ticker.C:
 			loop.jobChan <- func() {
 				loop.doInterval(i)
