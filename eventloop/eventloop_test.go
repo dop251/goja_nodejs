@@ -1,6 +1,7 @@
 package eventloop
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -271,5 +272,42 @@ func TestClearIntervalConcurrent(t *testing.T) {
 	loop.Stop()
 	if c := loop.jobCount; c != 0 {
 		t.Fatalf("jobCount: %d", c)
+	}
+}
+
+func TestRunOnStoppedLoop(t *testing.T) {
+	t.Parallel()
+	loop := NewEventLoop()
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for !t.Failed() {
+			loop.Start()
+			time.Sleep(10 * time.Millisecond)
+			loop.Stop()
+		}
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for !t.Failed() {
+			loop.RunOnLoop(func(*goja.Runtime) {
+				if !loop.canRun {
+					t.Fatal("running job on stopped loop")
+					return
+				}
+			})
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
 	}
 }

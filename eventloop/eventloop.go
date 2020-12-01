@@ -29,11 +29,14 @@ type EventLoop struct {
 	vm       *goja.Runtime
 	jobChan  chan func()
 	jobCount int32
-	running  bool
+	canRun   bool
 
 	auxJobs     []func()
 	auxJobsLock sync.Mutex
 	wakeup      chan struct{}
+
+	stopCond *sync.Cond
+	running  bool
 
 	enableConsole bool
 }
@@ -45,6 +48,7 @@ func NewEventLoop(opts ...Option) *EventLoop {
 		vm:            vm,
 		jobChan:       make(chan func()),
 		wakeup:        make(chan struct{}, 1),
+		stopCond:      sync.NewCond(&sync.Mutex{}),
 		enableConsole: true,
 	}
 
@@ -147,33 +151,49 @@ func (loop *EventLoop) ClearInterval(i *Interval) {
 	})
 }
 
+func (loop *EventLoop) setRunning() {
+	loop.stopCond.L.Lock()
+	if loop.running {
+		panic("Loop is already started")
+	}
+	loop.running = true
+	loop.stopCond.L.Unlock()
+}
+
 // Run calls the specified function, starts the event loop and waits until there are no more delayed jobs to run
 // after which it stops the loop and returns.
 // The instance of goja.Runtime that is passed to the function and any Values derived from it must not be used outside
 // of the function.
 // Do NOT use this function while the loop is already running. Use RunOnLoop() instead.
+// If the loop is already started it will panic.
 func (loop *EventLoop) Run(fn func(*goja.Runtime)) {
+	loop.setRunning()
 	fn(loop.vm)
 	loop.run(false)
 }
 
 // Start the event loop in the background. The loop continues to run until Stop() is called.
+// If the loop is already started it will panic.
 func (loop *EventLoop) Start() {
+	loop.setRunning()
 	go loop.run(true)
 }
 
 // Stop the loop that was started with Start(). After this function returns there will be no more jobs executed
 // by the loop. It is possible to call Start() or Run() again after this to resume the execution.
 // Note, it does not cancel active timeouts.
+// It is not allowed to run Start() and Stop() concurrently.
+// Calling Stop() on an already stopped loop or inside the loop will hang.
 func (loop *EventLoop) Stop() {
-	ch := make(chan struct{})
-
 	loop.jobChan <- func() {
-		loop.running = false
-		ch <- struct{}{}
+		loop.canRun = false
 	}
 
-	<-ch
+	loop.stopCond.L.Lock()
+	for loop.running {
+		loop.stopCond.Wait()
+	}
+	loop.stopCond.L.Unlock()
 }
 
 // RunOnLoop schedules to run the specified function in the context of the loop as soon as possible.
@@ -195,22 +215,28 @@ func (loop *EventLoop) runAux() {
 }
 
 func (loop *EventLoop) run(inBackground bool) {
-	loop.running = true
+	loop.canRun = true
 	loop.runAux()
 
-	for loop.running && (inBackground || loop.jobCount > 0) {
+	for loop.canRun && (inBackground || loop.jobCount > 0) {
 		select {
 		case job := <-loop.jobChan:
 			job()
-			select {
-			case <-loop.wakeup:
-				loop.runAux()
-			default:
+			if loop.canRun {
+				select {
+				case <-loop.wakeup:
+					loop.runAux()
+				default:
+				}
 			}
 		case <-loop.wakeup:
 			loop.runAux()
 		}
 	}
+	loop.stopCond.L.Lock()
+	loop.running = false
+	loop.stopCond.L.Unlock()
+	loop.stopCond.Broadcast()
 }
 
 func (loop *EventLoop) addAuxJob(fn func()) {
