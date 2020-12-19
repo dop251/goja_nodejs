@@ -335,3 +335,31 @@ func TestErrorPropagation(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSourceMapLoader(t *testing.T) {
+	vm := js.New()
+	r := NewRegistry(WithLoader(func(p string) ([]byte, error) {
+		switch p {
+		case "dir/m.js":
+			return []byte(`throw 'test passed';
+//# sourceMappingURL=m.js.map`), nil
+		case "dir/m.js.map":
+			return []byte(`{"version":3,"file":"m.js","sourceRoot":"","sources":["m.ts"],"names":[],"mappings":";AAAA"}
+`), nil
+		}
+		return nil, ModuleFileDoesNotExistError
+	}))
+
+	rr := r.Enable(vm)
+	_, err := rr.Require("./dir/m")
+	if err == nil {
+		t.Fatal("Expected an error")
+	}
+	if ex, ok := err.(*js.Exception); ok {
+		if !ex.Value().StrictEquals(vm.ToValue("test passed")) {
+			t.Fatalf("Unexpected Exception: %v", ex)
+		}
+	} else {
+		t.Fatal(err)
+	}
+}

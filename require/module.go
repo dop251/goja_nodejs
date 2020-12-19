@@ -10,6 +10,7 @@ import (
 	"text/template"
 
 	js "github.com/dop251/goja"
+	"github.com/dop251/goja/parser"
 )
 
 type ModuleLoader func(*js.Runtime, *js.Object)
@@ -61,6 +62,10 @@ func NewRegistryWithLoader(srcLoader SourceLoader) *Registry {
 
 type Option func(*Registry)
 
+// WithLoader sets a function which will be called by the require() function in order to get a source code for a
+// module at the given path. The same function will be used to get external source maps.
+// Note, this only affects the modules loaded by the require() function. If you need to use it as a source map
+// loader for code parsed in a different way (such as runtime.RunString() or eval()), use (*Runtime).SetParserOptions()
 func WithLoader(srcLoader SourceLoader) Option {
 	return func(r *Registry) {
 		r.srcLoader = srcLoader
@@ -123,32 +128,37 @@ func (r *Registry) getSource(p string) ([]byte, error) {
 	return srcLoader(p)
 }
 
-func (r *Registry) getCompiledSource(p string) (prg *js.Program, err error) {
+func (r *Registry) getCompiledSource(p string) (*js.Program, error) {
 	r.Lock()
 	defer r.Unlock()
 
-	prg = r.compiled[p]
+	prg := r.compiled[p]
 	if prg == nil {
-		if buf, err1 := r.getSource(p); err1 == nil {
-			s := string(buf)
-
-			if filepath.Ext(p) == ".json" {
-				s = "module.exports = JSON.parse('" + template.JSEscapeString(s) + "')"
-			}
-
-			source := "(function(exports, require, module) {" + s + "\n})"
-			prg, err = js.Compile(p, source, false)
-			if err == nil {
-				if r.compiled == nil {
-					r.compiled = make(map[string]*js.Program)
-				}
-				r.compiled[p] = prg
-			}
-		} else {
-			err = err1
+		buf, err := r.getSource(p)
+		if err != nil {
+			return nil, err
 		}
+		s := string(buf)
+
+		if filepath.Ext(p) == ".json" {
+			s = "module.exports = JSON.parse('" + template.JSEscapeString(s) + "')"
+		}
+
+		source := "(function(exports, require, module) {" + s + "\n})"
+		parsed, err := js.Parse(p, source, parser.WithSourceMapLoader(r.srcLoader))
+		if err != nil {
+			return nil, err
+		}
+		prg, err = js.CompileAST(parsed, false)
+		if err == nil {
+			if r.compiled == nil {
+				r.compiled = make(map[string]*js.Program)
+			}
+			r.compiled[p] = prg
+		}
+		return prg, err
 	}
-	return
+	return prg, nil
 }
 
 func (r *RequireModule) require(call js.FunctionCall) js.Value {
