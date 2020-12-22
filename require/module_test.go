@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
 	"path"
 	"testing"
 
@@ -350,6 +352,51 @@ func TestSourceMapLoader(t *testing.T) {
 
 	rr := r.Enable(vm)
 	_, err := rr.Require("./dir/m")
+	if err == nil {
+		t.Fatal("Expected an error")
+	}
+	if ex, ok := err.(*js.Exception); ok {
+		if !ex.Value().StrictEquals(vm.ToValue("test passed")) {
+			t.Fatalf("Unexpected Exception: %v", ex)
+		}
+	} else {
+		t.Fatal(err)
+	}
+}
+
+func testsetup() (string, func(), error) {
+	name, err := ioutil.TempDir("", "goja-nodejs-require-test")
+	if err != nil {
+		return "", nil, err
+	}
+	return name, func() {
+		os.RemoveAll(name)
+	}, nil
+}
+
+func TestDefaultModuleLoader(t *testing.T) {
+	workdir, teardown, err := testsetup()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer teardown()
+
+	err = os.Chdir(workdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.Mkdir("module", 0755)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ioutil.WriteFile("module/index.js", []byte(`throw 'test passed';`), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm := js.New()
+	r := NewRegistry()
+	rr := r.Enable(vm)
+	_, err = rr.Require("./module")
 	if err == nil {
 		t.Fatal("Expected an error")
 	}
