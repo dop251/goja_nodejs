@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path/filepath"
+	"path"
 	"testing"
 
 	js "github.com/dop251/goja"
@@ -13,9 +13,7 @@ import (
 
 func mapFileSystemSourceLoader(files map[string]string, t *testing.T) SourceLoader {
 	return func(path string) ([]byte, error) {
-		slashPath := filepath.ToSlash(path)
-		t.Logf("SourceLoader(%s) [%s]", path, slashPath)
-		s, ok := files[filepath.ToSlash(slashPath)]
+		s, ok := files[path]
 		if !ok {
 			return nil, ModuleFileDoesNotExistError
 		}
@@ -198,12 +196,12 @@ func TestStrictModule(t *testing.T) {
 }
 
 func TestResolve(t *testing.T) {
-	testRequire := func(src, path string, globalFolders []string, fs map[string]string) (*js.Runtime, js.Value, error) {
+	testRequire := func(src, fpath string, globalFolders []string, fs map[string]string) (*js.Runtime, js.Value, error) {
 		vm := js.New()
 		r := NewRegistry(WithGlobalFolders(globalFolders...), WithLoader(mapFileSystemSourceLoader(fs, t)))
 		r.Enable(vm)
-		t.Logf("Require(%s)", path)
-		ret, err := vm.RunScript(filepath.Join(src, "test.js"), fmt.Sprintf("require('%s')", path))
+		t.Logf("Require(%s)", fpath)
+		ret, err := vm.RunScript(path.Join(src, "test.js"), fmt.Sprintf("require('%s')", fpath))
 		if err != nil {
 			return nil, nil, err
 		}

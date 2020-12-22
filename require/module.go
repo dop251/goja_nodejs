@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
-	"path/filepath"
+	"path"
 	"sync"
 	"syscall"
 	"text/template"
@@ -140,7 +140,7 @@ func (r *Registry) getCompiledSource(p string) (*js.Program, error) {
 		}
 		s := string(buf)
 
-		if filepath.Ext(p) == ".json" {
+		if path.Ext(p) == ".json" {
 			s = "module.exports = JSON.parse('" + template.JSEscapeString(s) + "')"
 		}
 
@@ -173,7 +173,7 @@ func (r *RequireModule) require(call js.FunctionCall) js.Value {
 }
 
 func filepathClean(p string) string {
-	return filepath.Clean(p)
+	return path.Clean(p)
 }
 
 // Require can be used to import modules from Go source (similar to JS require() function).
