@@ -1,7 +1,7 @@
 package eventloop
 
 import (
-	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -278,36 +278,32 @@ func TestClearIntervalConcurrent(t *testing.T) {
 func TestRunOnStoppedLoop(t *testing.T) {
 	t.Parallel()
 	loop := NewEventLoop()
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
+	var failed int32
+	done := make(chan struct{})
 	go func() {
-		defer wg.Done()
-		for !t.Failed() {
+		for atomic.LoadInt32(&failed) == 0 {
 			loop.Start()
 			time.Sleep(10 * time.Millisecond)
 			loop.Stop()
 		}
 	}()
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
-		for !t.Failed() {
+		for atomic.LoadInt32(&failed) == 0 {
 			loop.RunOnLoop(func(*goja.Runtime) {
 				if !loop.canRun {
-					t.Fatal("running job on stopped loop")
+					atomic.StoreInt32(&failed, 1)
+					close(done)
 					return
 				}
 			})
 			time.Sleep(10 * time.Millisecond)
 		}
 	}()
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
+	}
+	if atomic.LoadInt32(&failed) != 0 {
+		t.Fatal("running job on stopped loop")
 	}
 }
