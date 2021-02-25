@@ -288,7 +288,7 @@ func (loop *EventLoop) doInterval(i *Interval) {
 }
 
 func (loop *EventLoop) clearTimeout(t *Timer) {
-	if !t.cancelled {
+	if t != nil && !t.cancelled {
 		t.timer.Stop()
 		t.cancelled = true
 		loop.jobCount--
@@ -296,7 +296,7 @@ func (loop *EventLoop) clearTimeout(t *Timer) {
 }
 
 func (loop *EventLoop) clearInterval(i *Interval) {
-	if !i.cancelled {
+	if i != nil && !i.cancelled {
 		i.cancelled = true
 		close(i.stopChan)
 		loop.jobCount--
