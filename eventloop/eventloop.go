@@ -250,6 +250,11 @@ func (loop *EventLoop) addAuxJob(fn func()) {
 }
 
 func (loop *EventLoop) addTimeout(f func(), timeout time.Duration) *Timer {
+	// If no timeout is provided set timeout to 1ms.  Follows node documentation.
+	// https://nodejs.org/api/timers.html#timers_settimeout_callback_delay_args
+	if timeout <= 0 {
+		timeout = time.Millisecond
+	}
 	t := &Timer{
 		job: job{fn: f},
 	}
@@ -263,6 +268,12 @@ func (loop *EventLoop) addTimeout(f func(), timeout time.Duration) *Timer {
 }
 
 func (loop *EventLoop) addInterval(f func(), timeout time.Duration) *Interval {
+	// If no timeout is provided set timeout to 1ms. Follows node documentation.
+	// https://nodejs.org/api/timers.html#timers_setinterval_callback_delay_args
+	if timeout <= 0 {
+		timeout = time.Millisecond
+	}
+
 	i := &Interval{
 		job:      job{fn: f},
 		ticker:   time.NewTicker(timeout),
