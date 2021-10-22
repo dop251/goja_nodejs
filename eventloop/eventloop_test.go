@@ -1,6 +1,7 @@
 package eventloop
 
 import (
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -305,5 +306,94 @@ func TestRunOnStoppedLoop(t *testing.T) {
 	}
 	if atomic.LoadInt32(&failed) != 0 {
 		t.Fatal("running job on stopped loop")
+	}
+}
+
+func TestPromise(t *testing.T) {
+	t.Parallel()
+	const SCRIPT = `
+	let result;
+	const p = new Promise((resolve, reject) => {
+		setTimeout(() => {resolve("passed")}, 500);
+	});
+	p.then(value => {
+		result = value;
+	});
+	`
+
+	loop := NewEventLoop()
+	prg, err := goja.Compile("main.js", SCRIPT, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loop.Run(func(vm *goja.Runtime) {
+		_, err = vm.RunProgram(prg)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	loop.Run(func(vm *goja.Runtime) {
+		result := vm.Get("result")
+		if !result.SameAs(vm.ToValue("passed")) {
+			err = fmt.Errorf("unexpected result: %v", result)
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPromiseNative(t *testing.T) {
+	t.Parallel()
+	const SCRIPT = `
+	let result;
+	p.then(value => {
+		result = value;
+		done();
+	});
+	`
+
+	loop := NewEventLoop()
+	prg, err := goja.Compile("main.js", SCRIPT, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch := make(chan error)
+	loop.Start()
+	defer loop.Stop()
+
+	loop.RunOnLoop(func(vm *goja.Runtime) {
+		vm.Set("done", func() {
+			ch <- nil
+		})
+		p, resolve, _ := vm.NewPromise()
+		vm.Set("p", p)
+		_, err = vm.RunProgram(prg)
+		if err != nil {
+			ch <- err
+			return
+		}
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			loop.RunOnLoop(func(*goja.Runtime) {
+				resolve("passed")
+			})
+		}()
+	})
+	err = <-ch
+	if err != nil {
+		t.Fatal(err)
+	}
+	loop.RunOnLoop(func(vm *goja.Runtime) {
+		result := vm.Get("result")
+		if !result.SameAs(vm.ToValue("passed")) {
+			ch <- fmt.Errorf("unexpected result: %v", result)
+		} else {
+			ch <- nil
+		}
+	})
+	err = <-ch
+	if err != nil {
+		t.Fatal(err)
 	}
 }
