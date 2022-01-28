@@ -28,6 +28,22 @@ var (
 	ModuleFileDoesNotExistError = errors.New("module file does not exist")
 )
 
+type ErrModuleFileDoesNotExist struct {
+	path string
+}
+
+func (e *ErrModuleFileDoesNotExist) Error() string {
+	return "module file does not exist: " + e.path
+}
+
+func (e *ErrModuleFileDoesNotExist) Is(err error) bool {
+	return err == ModuleFileDoesNotExistError
+}
+
+func (e *ErrModuleFileDoesNotExist) Unwrap() error {
+	return ModuleFileDoesNotExistError
+}
+
 var native map[string]ModuleLoader
 
 // Registry contains a cache of compiled modules which can be used by multiple Runtimes
@@ -115,7 +131,7 @@ func DefaultSourceLoader(filename string) ([]byte, error) {
 	data, err := ioutil.ReadFile(filepath.FromSlash(filename))
 	if err != nil {
 		if os.IsNotExist(err) || errors.Is(err, syscall.EISDIR) {
-			err = ModuleFileDoesNotExistError
+			err = &ErrModuleFileDoesNotExist{path: filename}
 		}
 	}
 	return data, err
