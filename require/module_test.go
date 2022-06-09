@@ -408,3 +408,75 @@ func TestDefaultModuleLoader(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestHotReload(t *testing.T) {
+
+	input := map[string]struct {
+		main                        string
+		firstRequire, secondRequire string
+		firstResult, secondResult   string
+	}{
+		"a.js": {
+			main:          "require('./a.js').hello()",
+			firstRequire:  `exports.hello = () => { return "Hello from a!" }`,
+			firstResult:   "Hello from a!",
+			secondRequire: `exports.hello = () => { return "Hello again from a!" }`,
+			secondResult:  "Hello again from a!",
+		},
+		"node_modules/b.js": {
+			main:          "require('b.js').hello()",
+			firstRequire:  `exports.hello = () => { return "Hello from b!" }`,
+			firstResult:   "Hello from b!",
+			secondRequire: `exports.hello = () => { return "Hello again from b!" }`,
+			secondResult:  "Hello again from b!",
+		},
+	}
+
+	firstRequire := true
+	vm := js.New()
+	r := NewRegistry(
+		WithHotReload(),
+		WithLoader(func(path string) ([]byte, error) {
+			code, exists := input[path]
+			if !exists {
+				return nil, errors.New(fmt.Sprintf("File '%s' not found", path))
+			}
+			if firstRequire {
+				firstRequire = false
+				return []byte(code.firstRequire), nil
+			} else {
+				return []byte(code.secondRequire), nil
+			}
+		}))
+	r.Enable(vm)
+
+	for _, c := range input {
+		firstRequire = true
+		result, err := vm.RunString(c.main)
+		if err != nil {
+			t.Fatalf("First Run: Unexpected Error: %v", err)
+		}
+
+		str, ok := result.Export().(string)
+		if !ok {
+			t.Fatalf("First Run: Result should have been of type string but was %T", result.Export())
+		}
+		if str != c.firstResult {
+			t.Fatalf("First Run: Value should have been '%s' but was '%s'", c.firstResult, str)
+		}
+
+		result, err = vm.RunString(c.main)
+		if err != nil {
+			t.Fatalf("Second Run: Unexpected Error: %v", err)
+		}
+
+		str, ok = result.Export().(string)
+		if !ok {
+			t.Fatalf("Second Run: Result should have been of type string but was %T", result.Export())
+		}
+		if str != c.secondResult {
+			t.Fatalf("Second Run: Value should have been '%s' but was '%s'", c.secondResult, str)
+		}
+	}
+
+}

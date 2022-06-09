@@ -17,6 +17,11 @@ func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
 		return nil, IllegalModuleNameError
 	}
 
+	if r.hotReload {
+		r.modules = map[string]*js.Object{}
+		r.nodeModules = map[string]*js.Object{}
+	}
+
 	module, err = r.loadNative(modpath)
 	if err == nil {
 		return

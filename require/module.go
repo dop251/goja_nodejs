@@ -33,8 +33,9 @@ var native map[string]ModuleLoader
 // Registry contains a cache of compiled modules which can be used by multiple Runtimes
 type Registry struct {
 	sync.Mutex
-	native   map[string]ModuleLoader
-	compiled map[string]*js.Program
+	native    map[string]ModuleLoader
+	compiled  map[string]*js.Program
+	hotReload bool
 
 	srcLoader     SourceLoader
 	globalFolders []string
@@ -45,6 +46,7 @@ type RequireModule struct {
 	runtime     *js.Runtime
 	modules     map[string]*js.Object
 	nodeModules map[string]*js.Object
+	hotReload   bool
 }
 
 func NewRegistry(opts ...Option) *Registry {
@@ -86,6 +88,16 @@ func WithGlobalFolders(globalFolders ...string) Option {
 	}
 }
 
+// WithHotReload enables hot reload of files being required.
+// Per Default it is disabled.
+// When enabled a call to `require` will always reload the file from disk
+// (or the given source loader) and recompile it.
+func WithHotReload() Option {
+	return func(r *Registry) {
+		r.hotReload = true
+	}
+}
+
 // Enable adds the require() function to the specified runtime.
 func (r *Registry) Enable(runtime *js.Runtime) *RequireModule {
 	rrt := &RequireModule{
@@ -93,6 +105,7 @@ func (r *Registry) Enable(runtime *js.Runtime) *RequireModule {
 		runtime:     runtime,
 		modules:     make(map[string]*js.Object),
 		nodeModules: make(map[string]*js.Object),
+		hotReload:   r.hotReload,
 	}
 
 	runtime.Set("require", rrt.require)
@@ -134,6 +147,12 @@ func (r *Registry) getCompiledSource(p string) (*js.Program, error) {
 	defer r.Unlock()
 
 	prg := r.compiled[p]
+
+	if r.hotReload {
+		// always reload from source when hot reload is active
+		prg = nil
+	}
+
 	if prg == nil {
 		buf, err := r.getSource(p)
 		if err != nil {
