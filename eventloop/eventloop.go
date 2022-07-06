@@ -39,6 +39,7 @@ type EventLoop struct {
 	running  bool
 
 	enableConsole bool
+	registry      *require.Registry
 }
 
 func NewEventLoop(opts ...Option) *EventLoop {
@@ -55,8 +56,10 @@ func NewEventLoop(opts ...Option) *EventLoop {
 	for _, opt := range opts {
 		opt(loop)
 	}
-
-	new(require.Registry).Enable(vm)
+	if loop.registry == nil {
+		loop.registry = new(require.Registry)
+	}
+	loop.registry.Enable(vm)
 	if loop.enableConsole {
 		console.Enable(vm)
 	}
@@ -77,6 +80,12 @@ type Option func(*EventLoop)
 func EnableConsole(enableConsole bool) Option {
 	return func(loop *EventLoop) {
 		loop.enableConsole = enableConsole
+	}
+}
+
+func WithRegistry(registry *require.Registry) Option {
+	return func(loop *EventLoop) {
+		loop.registry = registry
 	}
 }
 
