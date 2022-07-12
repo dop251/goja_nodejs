@@ -195,7 +195,7 @@ func Require(runtime *js.Runtime, name string) js.Value {
 		}
 		return mod
 	}
-	panic(runtime.NewTypeError("Please enable require for this runtime using new(require.Require).Enable(runtime)"))
+	panic(runtime.NewTypeError("Please enable require for this runtime using new(require.Registry).Enable(runtime)"))
 }
 
 func RegisterNativeModule(name string, loader ModuleLoader) {
