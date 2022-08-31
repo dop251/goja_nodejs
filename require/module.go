@@ -2,7 +2,6 @@ package require
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -114,7 +113,7 @@ func (r *Registry) RegisterNativeModule(name string, loader ModuleLoader) {
 // DefaultSourceLoader is used if none was set (see WithLoader()). It simply loads files from the host's filesystem.
 func DefaultSourceLoader(filename string) ([]byte, error) {
 	fp := filepath.FromSlash(filename)
-	data, err := ioutil.ReadFile(fp)
+	data, err := os.ReadFile(fp)
 	if err != nil {
 		if os.IsNotExist(err) || errors.Is(err, syscall.EISDIR) {
 			err = ModuleFileDoesNotExistError

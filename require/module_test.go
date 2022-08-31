@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -13,7 +12,7 @@ import (
 	js "github.com/dop251/goja"
 )
 
-func mapFileSystemSourceLoader(files map[string]string, t *testing.T) SourceLoader {
+func mapFileSystemSourceLoader(files map[string]string) SourceLoader {
 	return func(path string) ([]byte, error) {
 		s, ok := files[path]
 		if !ok {
@@ -200,7 +199,7 @@ func TestStrictModule(t *testing.T) {
 func TestResolve(t *testing.T) {
 	testRequire := func(src, fpath string, globalFolders []string, fs map[string]string) (*js.Runtime, js.Value, error) {
 		vm := js.New()
-		r := NewRegistry(WithGlobalFolders(globalFolders...), WithLoader(mapFileSystemSourceLoader(fs, t)))
+		r := NewRegistry(WithGlobalFolders(globalFolders...), WithLoader(mapFileSystemSourceLoader(fs)))
 		r.Enable(vm)
 		t.Logf("Require(%s)", fpath)
 		ret, err := vm.RunScript(path.Join(src, "test.js"), fmt.Sprintf("require('%s')", fpath))
@@ -302,7 +301,7 @@ func TestRequireCycle(t *testing.T) {
 	r := NewRegistry(WithLoader(mapFileSystemSourceLoader(map[string]string{
 		"a.js": `var b = require('./b.js'); exports.done = true;`,
 		"b.js": `var a = require('./a.js'); exports.done = true;`,
-	}, t)))
+	})))
 	r.Enable(vm)
 	res, err := vm.RunString(`
 	var a = require('./a.js');
@@ -321,7 +320,7 @@ func TestErrorPropagation(t *testing.T) {
 	vm := js.New()
 	r := NewRegistry(WithLoader(mapFileSystemSourceLoader(map[string]string{
 		"m.js": `throw 'test passed';`,
-	}, t)))
+	})))
 	rr := r.Enable(vm)
 	_, err := rr.Require("./m")
 	if err == nil {
@@ -365,7 +364,7 @@ func TestSourceMapLoader(t *testing.T) {
 }
 
 func testsetup() (string, func(), error) {
-	name, err := ioutil.TempDir("", "goja-nodejs-require-test")
+	name, err := os.MkdirTemp("", "goja-nodejs-require-test")
 	if err != nil {
 		return "", nil, err
 	}
@@ -389,7 +388,7 @@ func TestDefaultModuleLoader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ioutil.WriteFile("module/index.js", []byte(`throw 'test passed';`), 0644)
+	err = os.WriteFile("module/index.js", []byte(`throw 'test passed';`), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
