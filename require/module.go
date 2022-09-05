@@ -2,7 +2,6 @@ package require
 
 import (
 	"errors"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -118,11 +117,15 @@ func DefaultSourceLoader(filename string) ([]byte, error) {
 	if err != nil {
 		if os.IsNotExist(err) || errors.Is(err, syscall.EISDIR) {
 			err = ModuleFileDoesNotExistError
-		} else if runtime.GOOS == "windows" { // temporary workaround for https://github.com/dop251/goja_nodejs/issues/21
-			log.Printf("Type: %T, err: %#v", err, err)
-			fi, err1 := os.Stat(fp)
-			if err1 == nil && fi.IsDir() {
+		} else if runtime.GOOS == "windows" {
+			if errors.Is(err, syscall.Errno(0x7b)) { // ERROR_INVALID_NAME, The filename, directory name, or volume label syntax is incorrect.
 				err = ModuleFileDoesNotExistError
+			} else {
+				// temporary workaround for https://github.com/dop251/goja_nodejs/issues/21
+				fi, err1 := os.Stat(fp)
+				if err1 == nil && fi.IsDir() {
+					err = ModuleFileDoesNotExistError
+				}
 			}
 		}
 	}
