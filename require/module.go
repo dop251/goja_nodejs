@@ -2,6 +2,7 @@ package require
 
 import (
 	"errors"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -197,6 +198,7 @@ func Require(runtime *js.Runtime, name string) js.Value {
 	if r, ok := js.AssertFunction(runtime.Get("require")); ok {
 		mod, err := r(js.Undefined(), runtime.ToValue(name))
 		if err != nil {
+			log.Printf("Type: %T, err: %#v", err, err)
 			panic(err)
 		}
 		return mod
