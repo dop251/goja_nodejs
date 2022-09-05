@@ -40,7 +40,7 @@ func TestConsoleWithPrinter(t *testing.T) {
 
 	registry := new(require.Registry)
 	registry.Enable(vm)
-	registry.RegisterNativeModule("console", RequireWithPrinter(printer))
+	registry.RegisterNativeModule(ModuleName, RequireWithPrinter(printer))
 	Enable(vm)
 
 	if c := vm.Get("console"); c == nil {

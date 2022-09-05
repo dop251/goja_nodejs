@@ -6,6 +6,8 @@ import (
 	"github.com/dop251/goja_nodejs/require"
 )
 
+const ModuleName = "node:util"
+
 type Util struct {
 	runtime *goja.Runtime
 }
@@ -98,5 +100,5 @@ func New(runtime *goja.Runtime) *Util {
 }
 
 func init() {
-	require.RegisterNativeModule("util", Require)
+	require.RegisterNativeModule(ModuleName, Require)
 }
