@@ -119,6 +119,7 @@ func DefaultSourceLoader(filename string) ([]byte, error) {
 		if os.IsNotExist(err) || errors.Is(err, syscall.EISDIR) {
 			err = ModuleFileDoesNotExistError
 		} else if runtime.GOOS == "windows" { // temporary workaround for https://github.com/dop251/goja_nodejs/issues/21
+			log.Printf("Type: %T, err: %#v", err, err)
 			fi, err1 := os.Stat(fp)
 			if err1 == nil && fi.IsDir() {
 				err = ModuleFileDoesNotExistError
@@ -198,7 +199,6 @@ func Require(runtime *js.Runtime, name string) js.Value {
 	if r, ok := js.AssertFunction(runtime.Get("require")); ok {
 		mod, err := r(js.Undefined(), runtime.ToValue(name))
 		if err != nil {
-			log.Printf("Type: %T, err: %#v", err, err)
 			panic(err)
 		}
 		return mod
