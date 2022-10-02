@@ -194,15 +194,19 @@ func (loop *EventLoop) Start() {
 // It is not allowed to run Start() and Stop() concurrently.
 // Calling Stop() on an already stopped loop or inside the loop will hang.
 func (loop *EventLoop) Stop() {
+	loop.stopCond.L.Lock()
+	defer loop.stopCond.L.Unlock()
+	if !loop.running {
+		return
+	}
+
 	loop.jobChan <- func() {
 		loop.canRun = false
 	}
 
-	loop.stopCond.L.Lock()
 	for loop.running {
 		loop.stopCond.Wait()
 	}
-	loop.stopCond.L.Unlock()
 }
 
 // RunOnLoop schedules to run the specified function in the context of the loop as soon as possible.
