@@ -25,6 +25,12 @@ type Interval struct {
 	stopChan chan struct{}
 }
 
+const (
+	loopIdle uint8 = iota
+	loopRunning
+	loopStopping
+)
+
 type EventLoop struct {
 	vm       *goja.Runtime
 	jobChan  chan func()
@@ -35,8 +41,8 @@ type EventLoop struct {
 	auxJobsLock sync.Mutex
 	wakeup      chan struct{}
 
-	stopCond *sync.Cond
-	running  bool
+	statusCond *sync.Cond
+	status     uint8
 
 	enableConsole bool
 	registry      *require.Registry
@@ -49,7 +55,8 @@ func NewEventLoop(opts ...Option) *EventLoop {
 		vm:            vm,
 		jobChan:       make(chan func()),
 		wakeup:        make(chan struct{}, 1),
-		stopCond:      sync.NewCond(&sync.Mutex{}),
+		statusCond:      sync.NewCond(&sync.Mutex{}),
+		status:        loopIdle,
 		enableConsole: true,
 	}
 
@@ -161,12 +168,12 @@ func (loop *EventLoop) ClearInterval(i *Interval) {
 }
 
 func (loop *EventLoop) setRunning() {
-	loop.stopCond.L.Lock()
-	if loop.running {
+	loop.statusCond.L.Lock()
+	if loop.status != loopIdle {
 		panic("Loop is already started")
 	}
-	loop.running = true
-	loop.stopCond.L.Unlock()
+	loop.status = loopRunning
+	loop.statusCond.L.Unlock()
 }
 
 // Run calls the specified function, starts the event loop and waits until there are no more delayed jobs to run
@@ -194,9 +201,9 @@ func (loop *EventLoop) Start() {
 // It is not allowed to run Start() and Stop() concurrently.
 // Calling Stop() on an already stopped loop or inside the loop will hang.
 func (loop *EventLoop) Stop() {
-	loop.stopCond.L.Lock()
-	defer loop.stopCond.L.Unlock()
-	if !loop.running {
+	loop.statusCond.L.Lock()
+	defer loop.statusCond.L.Unlock()
+	if !loop.status != loopRunning {
 		return
 	}
 
@@ -204,8 +211,8 @@ func (loop *EventLoop) Stop() {
 		loop.canRun = false
 	}
 
-	for loop.running {
-		loop.stopCond.Wait()
+	for loop.status != loopIdle {
+		loop.statusCond.Wait()
 	}
 }
 
@@ -246,10 +253,10 @@ func (loop *EventLoop) run(inBackground bool) {
 			loop.runAux()
 		}
 	}
-	loop.stopCond.L.Lock()
-	loop.running = false
-	loop.stopCond.L.Unlock()
-	loop.stopCond.Broadcast()
+	loop.statusCond.L.Lock()
+	loop.status = loopIdle
+	loop.statusCond.L.Unlock()
+	loop.statusCond.Broadcast()
 }
 
 func (loop *EventLoop) addAuxJob(fn func()) {
