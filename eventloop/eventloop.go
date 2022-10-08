@@ -82,6 +82,13 @@ func NewEventLoop(opts ...Option) *EventLoop {
 
 type Option func(*EventLoop)
 
+// WithRuntime set the goja.Runtime insteat of create a new one
+func WithRuntime(runtime *goja.Runtime) Option {
+	return func(loop *EventLoop) {
+		loop.vm = runtime
+	}
+}
+
 // EnableConsole controls whether the "console" module is loaded into
 // the runtime used by the loop.  By default, loops are created with
 // the "console" module loaded, pass EnableConsole(false) to
@@ -96,6 +103,11 @@ func WithRegistry(registry *require.Registry) Option {
 	return func(loop *EventLoop) {
 		loop.registry = registry
 	}
+}
+
+// Runtime returns the goja.Runtime used by the loop
+func (loop *EventLoop) Runtime() *goja.Runtime {
+	return loop.vm
 }
 
 func (loop *EventLoop) schedule(call goja.FunctionCall, repeating bool) goja.Value {
