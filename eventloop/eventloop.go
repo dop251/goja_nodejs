@@ -51,10 +51,7 @@ type EventLoop struct {
 }
 
 func NewEventLoop(opts ...Option) *EventLoop {
-	vm := goja.New()
-
 	loop := &EventLoop{
-		vm:            vm,
 		jobChan:       make(chan func()),
 		auxFlag:       make(chan struct{}, 1),
 		statusCond:    sync.NewCond(&sync.Mutex{}),
@@ -65,17 +62,20 @@ func NewEventLoop(opts ...Option) *EventLoop {
 	for _, opt := range opts {
 		opt(loop)
 	}
+	if loop.vm == nil {
+		loop.vm = goja.New()
+	}
 	if loop.registry == nil {
 		loop.registry = new(require.Registry)
 	}
-	loop.registry.Enable(vm)
+	loop.registry.Enable(loop.vm)
 	if loop.enableConsole {
-		console.Enable(vm)
+		console.Enable(loop.vm)
 	}
-	vm.Set("setTimeout", loop.setTimeout)
-	vm.Set("setInterval", loop.setInterval)
-	vm.Set("clearTimeout", loop.clearTimeout)
-	vm.Set("clearInterval", loop.clearInterval)
+	loop.vm.Set("setTimeout", loop.setTimeout)
+	loop.vm.Set("setInterval", loop.setInterval)
+	loop.vm.Set("clearTimeout", loop.clearTimeout)
+	loop.vm.Set("clearInterval", loop.clearInterval)
 
 	return loop
 }
@@ -191,6 +191,14 @@ func (loop *EventLoop) setRunning() {
 	loop.statusCond.L.Unlock()
 }
 
+// Done returns a channel that's closed when this loop done
+func (loop *EventLoop) Done()(<-chan struct{}){
+	if loop.runCtx == nil {
+		return nil
+	}
+	return loop.runCtx.Done()
+}
+
 // Run calls the specified function, starts the event loop and waits until there are no more delayed jobs to run
 // after which it stops the loop and returns.
 // The instance of goja.Runtime that is passed to the function and any Values derived from it must not be used outside
@@ -247,7 +255,8 @@ func (loop *EventLoop) runAux() {
 	}
 }
 
-func (loop *EventLoop) canRun()(ok bool){
+// Running returns true when loop is running
+func (loop *EventLoop) Running()(ok bool) {
 	loop.statusCond.L.Lock()
 	ok = loop.status == loopRunning
 	loop.statusCond.L.Unlock()
@@ -263,12 +272,10 @@ L:
 		select {
 		case job := <-loop.jobChan:
 			job()
-			if loop.canRun() {
-				select {
-				case <-loop.auxFlag:
-					loop.runAux()
-				default:
-				}
+			select {
+			case <-loop.auxFlag:
+				loop.runAux()
+			default:
 			}
 		case <-loop.auxFlag:
 			loop.runAux()
