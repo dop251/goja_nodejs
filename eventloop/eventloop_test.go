@@ -9,8 +9,12 @@ import (
 	"github.com/dop251/goja"
 )
 
+const parallelTest = true
+
 func TestRun(t *testing.T) {
-	t.Parallel()
+	if parallelTest {
+		t.Parallel()
+	}
 	const SCRIPT = `
 	setTimeout(function() {
 		console.log("ok");
@@ -29,7 +33,9 @@ func TestRun(t *testing.T) {
 }
 
 func TestStart(t *testing.T) {
-	t.Parallel()
+	if parallelTest {
+		t.Parallel()
+	}
 	const SCRIPT = `
 	setTimeout(function() {
 		console.log("ok");
@@ -53,8 +59,54 @@ func TestStart(t *testing.T) {
 	loop.Stop()
 }
 
+func TestStop(t *testing.T) {
+	if parallelTest {
+		t.Parallel()
+	}
+	const SCRIPT = `
+	setTimeout(function() {
+		console.log("not ok");
+		throw 'failed';
+	}, 1000);
+	console.log("Started");
+	`
+
+	prg, err := goja.Compile("main.js", SCRIPT, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loop := NewEventLoop()
+	loop.Start()
+
+	loop.RunOnLoop(func(vm *goja.Runtime) {
+		vm.RunProgram(prg)
+	})
+
+	time.Sleep(500 * time.Millisecond)
+	loop.Stop()
+	time.Sleep(time.Second)
+	loop.Stop()
+}
+
+func TestStop2(t *testing.T) {
+	if parallelTest {
+		t.Parallel()
+	}
+
+	loop := NewEventLoop()
+	loop.Start()
+
+	go loop.Stop()
+	go loop.Stop()
+	loop.Stop()
+	time.Sleep(500 * time.Millisecond)
+}
+
 func TestInterval(t *testing.T) {
-	t.Parallel()
+	if parallelTest {
+		t.Parallel()
+	}
 	const SCRIPT = `
 	var count = 0;
 	var t = setInterval(function() {
@@ -138,7 +190,9 @@ func TestRunNoConsole(t *testing.T) {
 }
 
 func TestClearIntervalRace(t *testing.T) {
-	t.Parallel()
+	if parallelTest {
+		t.Parallel()
+	}
 	const SCRIPT = `
 	console.log("calling setInterval");
 	var t = setInterval(function() {
@@ -165,7 +219,9 @@ func TestClearIntervalRace(t *testing.T) {
 }
 
 func TestNativeTimeout(t *testing.T) {
-	t.Parallel()
+	if parallelTest {
+		t.Parallel()
+	}
 	fired := false
 	loop := NewEventLoop()
 	loop.SetTimeout(func(*goja.Runtime) {
@@ -180,7 +236,9 @@ func TestNativeTimeout(t *testing.T) {
 }
 
 func TestNativeClearTimeout(t *testing.T) {
-	t.Parallel()
+	if parallelTest {
+		t.Parallel()
+	}
 	fired := false
 	loop := NewEventLoop()
 	timer := loop.SetTimeout(func(*goja.Runtime) {
@@ -198,7 +256,9 @@ func TestNativeClearTimeout(t *testing.T) {
 }
 
 func TestNativeInterval(t *testing.T) {
-	t.Parallel()
+	if parallelTest {
+		t.Parallel()
+	}
 	count := 0
 	loop := NewEventLoop()
 	var i *Interval
@@ -218,7 +278,9 @@ func TestNativeInterval(t *testing.T) {
 }
 
 func TestNativeClearInterval(t *testing.T) {
-	t.Parallel()
+	if parallelTest {
+		t.Parallel()
+	}
 	count := 0
 	loop := NewEventLoop()
 	loop.Run(func(*goja.Runtime) {
@@ -235,7 +297,9 @@ func TestNativeClearInterval(t *testing.T) {
 }
 
 func TestSetTimeoutConcurrent(t *testing.T) {
-	t.Parallel()
+	if parallelTest {
+		t.Parallel()
+	}
 	loop := NewEventLoop()
 	loop.Start()
 	ch := make(chan struct{}, 1)
@@ -247,7 +311,9 @@ func TestSetTimeoutConcurrent(t *testing.T) {
 }
 
 func TestClearTimeoutConcurrent(t *testing.T) {
-	t.Parallel()
+	if parallelTest {
+		t.Parallel()
+	}
 	loop := NewEventLoop()
 	loop.Start()
 	timer := loop.SetTimeout(func(*goja.Runtime) {
@@ -260,7 +326,9 @@ func TestClearTimeoutConcurrent(t *testing.T) {
 }
 
 func TestClearIntervalConcurrent(t *testing.T) {
-	t.Parallel()
+	if parallelTest {
+		t.Parallel()
+	}
 	loop := NewEventLoop()
 	loop.Start()
 	ch := make(chan struct{}, 1)
@@ -277,7 +345,9 @@ func TestClearIntervalConcurrent(t *testing.T) {
 }
 
 func TestRunOnStoppedLoop(t *testing.T) {
-	t.Parallel()
+	if parallelTest {
+		t.Parallel()
+	}
 	loop := NewEventLoop()
 	var failed int32
 	done := make(chan struct{})
@@ -291,7 +361,7 @@ func TestRunOnStoppedLoop(t *testing.T) {
 	go func() {
 		for atomic.LoadInt32(&failed) == 0 {
 			loop.RunOnLoop(func(*goja.Runtime) {
-				if !loop.canRun {
+				if !loop.canRun() {
 					atomic.StoreInt32(&failed, 1)
 					close(done)
 					return
@@ -310,7 +380,9 @@ func TestRunOnStoppedLoop(t *testing.T) {
 }
 
 func TestPromise(t *testing.T) {
-	t.Parallel()
+	if parallelTest {
+		t.Parallel()
+	}
 	const SCRIPT = `
 	let result;
 	const p = new Promise((resolve, reject) => {
@@ -344,7 +416,9 @@ func TestPromise(t *testing.T) {
 }
 
 func TestPromiseNative(t *testing.T) {
-	t.Parallel()
+	if parallelTest {
+		t.Parallel()
+	}
 	const SCRIPT = `
 	let result;
 	p.then(value => {
