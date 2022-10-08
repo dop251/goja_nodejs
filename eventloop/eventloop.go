@@ -1,6 +1,7 @@
 package eventloop
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -35,14 +36,15 @@ type EventLoop struct {
 	vm       *goja.Runtime
 	jobChan  chan func()
 	jobCount int32
-	canRun   bool
 
 	auxJobs     []func()
 	auxJobsLock sync.Mutex
-	wakeup      chan struct{}
+	auxFlag     chan struct{}
 
 	statusCond *sync.Cond
 	status     uint8
+	runCtx     context.Context
+	stopFunc   context.CancelFunc
 
 	enableConsole bool
 	registry      *require.Registry
@@ -54,8 +56,8 @@ func NewEventLoop(opts ...Option) *EventLoop {
 	loop := &EventLoop{
 		vm:            vm,
 		jobChan:       make(chan func()),
-		wakeup:        make(chan struct{}, 1),
-		statusCond:      sync.NewCond(&sync.Mutex{}),
+		auxFlag:       make(chan struct{}, 1),
+		statusCond:    sync.NewCond(&sync.Mutex{}),
 		status:        loopIdle,
 		enableConsole: true,
 	}
@@ -173,6 +175,7 @@ func (loop *EventLoop) setRunning() {
 		panic("Loop is already started")
 	}
 	loop.status = loopRunning
+	loop.runCtx, loop.stopFunc = context.WithCancel(context.Background())
 	loop.statusCond.L.Unlock()
 }
 
@@ -203,13 +206,11 @@ func (loop *EventLoop) Start() {
 func (loop *EventLoop) Stop() {
 	loop.statusCond.L.Lock()
 	defer loop.statusCond.L.Unlock()
-	if !loop.status != loopRunning {
+	if loop.status != loopRunning {
 		return
 	}
 
-	loop.jobChan <- func() {
-		loop.canRun = false
-	}
+	loop.stopFunc()
 
 	for loop.status != loopIdle {
 		loop.statusCond.Wait()
@@ -234,23 +235,33 @@ func (loop *EventLoop) runAux() {
 	}
 }
 
+func (loop *EventLoop) canRun()(ok bool){
+	loop.statusCond.L.Lock()
+	ok = loop.status == loopRunning
+	loop.statusCond.L.Unlock()
+	return
+}
+
 func (loop *EventLoop) run(inBackground bool) {
-	loop.canRun = true
+	defer loop.stopFunc()
 	loop.runAux()
 
-	for loop.canRun && (inBackground || loop.jobCount > 0) {
+L:
+	for inBackground || loop.jobCount > 0 {
 		select {
 		case job := <-loop.jobChan:
 			job()
-			if loop.canRun {
+			if loop.canRun() {
 				select {
-				case <-loop.wakeup:
+				case <-loop.auxFlag:
 					loop.runAux()
 				default:
 				}
 			}
-		case <-loop.wakeup:
+		case <-loop.auxFlag:
 			loop.runAux()
+		case <-loop.runCtx.Done():
+			break L
 		}
 	}
 	loop.statusCond.L.Lock()
@@ -264,7 +275,7 @@ func (loop *EventLoop) addAuxJob(fn func()) {
 	loop.auxJobs = append(loop.auxJobs, fn)
 	loop.auxJobsLock.Unlock()
 	select {
-	case loop.wakeup <- struct{}{}:
+	case loop.auxFlag <- struct{}{}:
 	default:
 	}
 }
