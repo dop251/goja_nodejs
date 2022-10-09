@@ -291,7 +291,7 @@ func TestRunOnStoppedLoop(t *testing.T) {
 	go func() {
 		for atomic.LoadInt32(&failed) == 0 {
 			loop.RunOnLoop(func(*goja.Runtime) {
-				if !loop.canRun {
+				if !loop.running {
 					atomic.StoreInt32(&failed, 1)
 					close(done)
 					return
@@ -395,5 +395,24 @@ func TestPromiseNative(t *testing.T) {
 	err = <-ch
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestEventLoop_StopNoWait(t *testing.T) {
+	t.Parallel()
+	loop := NewEventLoop()
+	var ran int32
+	loop.Run(func(runtime *goja.Runtime) {
+		loop.SetTimeout(func(*goja.Runtime) {
+			atomic.StoreInt32(&ran, 1)
+		}, 5 * time.Second)
+
+		loop.SetTimeout(func(*goja.Runtime) {
+			loop.StopNoWait()
+		}, 500 * time.Millisecond)
+	})
+
+	if atomic.LoadInt32(&ran) != 0 {
+		t.Fatal("ran != 0")
 	}
 }

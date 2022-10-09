@@ -2,6 +2,7 @@ package eventloop
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dop251/goja"
@@ -29,12 +30,14 @@ type EventLoop struct {
 	vm       *goja.Runtime
 	jobChan  chan func()
 	jobCount int32
-	canRun   bool
+	canRun   int32
 
-	auxJobs     []func()
 	auxJobsLock sync.Mutex
-	wakeup      chan struct{}
+	wakeupChan  chan struct{}
 
+	auxJobsSpare, auxJobs     []func()
+
+	stopLock sync.Mutex
 	stopCond *sync.Cond
 	running  bool
 
@@ -48,10 +51,10 @@ func NewEventLoop(opts ...Option) *EventLoop {
 	loop := &EventLoop{
 		vm:            vm,
 		jobChan:       make(chan func()),
-		wakeup:        make(chan struct{}, 1),
-		stopCond:      sync.NewCond(&sync.Mutex{}),
+		wakeupChan:    make(chan struct{}, 1),
 		enableConsole: true,
 	}
+	loop.stopCond = sync.NewCond(&loop.stopLock)
 
 	for _, opt := range opts {
 		opt(loop)
@@ -119,8 +122,8 @@ func (loop *EventLoop) setInterval(call goja.FunctionCall) goja.Value {
 // of the loop as soon as possible after the specified timeout period.
 // SetTimeout returns a Timer which can be passed to ClearTimeout.
 // The instance of goja.Runtime that is passed to the function and any Values derived
-// from it must not be used outside of the function. SetTimeout is
-// safe to call inside or outside of the loop.
+// from it must not be used outside the function. SetTimeout is
+// safe to call inside or outside the loop.
 func (loop *EventLoop) SetTimeout(fn func(*goja.Runtime), timeout time.Duration) *Timer {
 	t := loop.addTimeout(func() { fn(loop.vm) }, timeout)
 	loop.addAuxJob(func() {
@@ -130,7 +133,7 @@ func (loop *EventLoop) SetTimeout(fn func(*goja.Runtime), timeout time.Duration)
 }
 
 // ClearTimeout cancels a Timer returned by SetTimeout if it has not run yet.
-// ClearTimeout is safe to call inside or outside of the loop.
+// ClearTimeout is safe to call inside or outside the loop.
 func (loop *EventLoop) ClearTimeout(t *Timer) {
 	loop.addAuxJob(func() {
 		loop.clearTimeout(t)
@@ -141,8 +144,8 @@ func (loop *EventLoop) ClearTimeout(t *Timer) {
 // the context of the loop as soon as possible after every specified
 // timeout period.  SetInterval returns an Interval which can be
 // passed to ClearInterval. The instance of goja.Runtime that is passed to the
-// function and any Values derived from it must not be used outside of
-// the function. SetInterval is safe to call inside or outside of the
+// function and any Values derived from it must not be used outside
+// the function. SetInterval is safe to call inside or outside the
 // loop.
 func (loop *EventLoop) SetInterval(fn func(*goja.Runtime), timeout time.Duration) *Interval {
 	i := loop.addInterval(func() { fn(loop.vm) }, timeout)
@@ -153,7 +156,7 @@ func (loop *EventLoop) SetInterval(fn func(*goja.Runtime), timeout time.Duration
 }
 
 // ClearInterval cancels an Interval returned by SetInterval.
-// ClearInterval is safe to call inside or outside of the loop.
+// ClearInterval is safe to call inside or outside the loop.
 func (loop *EventLoop) ClearInterval(i *Interval) {
 	loop.addAuxJob(func() {
 		loop.clearInterval(i)
@@ -161,18 +164,19 @@ func (loop *EventLoop) ClearInterval(i *Interval) {
 }
 
 func (loop *EventLoop) setRunning() {
-	loop.stopCond.L.Lock()
+	loop.stopLock.Lock()
+	defer loop.stopLock.Unlock()
 	if loop.running {
 		panic("Loop is already started")
 	}
 	loop.running = true
-	loop.stopCond.L.Unlock()
+	atomic.StoreInt32(&loop.canRun, 1)
 }
 
 // Run calls the specified function, starts the event loop and waits until there are no more delayed jobs to run
 // after which it stops the loop and returns.
-// The instance of goja.Runtime that is passed to the function and any Values derived from it must not be used outside
-// of the function.
+// The instance of goja.Runtime that is passed to the function and any Values derived from it must not be used
+// outside the function.
 // Do NOT use this function while the loop is already running. Use RunOnLoop() instead.
 // If the loop is already started it will panic.
 func (loop *EventLoop) Run(fn func(*goja.Runtime)) {
@@ -191,24 +195,35 @@ func (loop *EventLoop) Start() {
 // Stop the loop that was started with Start(). After this function returns there will be no more jobs executed
 // by the loop. It is possible to call Start() or Run() again after this to resume the execution.
 // Note, it does not cancel active timeouts.
-// It is not allowed to run Start() and Stop() concurrently.
-// Calling Stop() on an already stopped loop or inside the loop will hang.
+// It is not allowed to run Start() (or Run()) and Stop() concurrently.
+// Calling Stop() on a non-running loop has no effect.
+// It is not allowed to call Stop() from the loop, because it is synchronous and cannot complete until the loop
+// is not running any jobs. Use StopNoWait() instead.
 func (loop *EventLoop) Stop() {
-	loop.jobChan <- func() {
-		loop.canRun = false
-	}
-
-	loop.stopCond.L.Lock()
+	loop.stopLock.Lock()
 	for loop.running {
+		atomic.StoreInt32(&loop.canRun, 0)
+		loop.wakeup()
 		loop.stopCond.Wait()
 	}
-	loop.stopCond.L.Unlock()
+	loop.stopLock.Unlock()
+}
+
+// StopNoWait tells the loop to stop and returns immediately. Can be used inside the loop. Calling it on a
+// non-running loop has no effect.
+func (loop *EventLoop) StopNoWait() {
+	loop.stopLock.Lock()
+	if loop.running {
+		atomic.StoreInt32(&loop.canRun, 0)
+		loop.wakeup()
+	}
+	loop.stopLock.Unlock()
 }
 
 // RunOnLoop schedules to run the specified function in the context of the loop as soon as possible.
 // The order of the runs is preserved (i.e. the functions will be called in the same order as calls to RunOnLoop())
-// The instance of goja.Runtime that is passed to the function and any Values derived from it must not be used outside
-// of the function. It is safe to call inside or outside of the loop.
+// The instance of goja.Runtime that is passed to the function and any Values derived from it must not be used
+// outside the function. It is safe to call inside or outside the loop.
 func (loop *EventLoop) RunOnLoop(fn func(*goja.Runtime)) {
 	loop.addAuxJob(func() { fn(loop.vm) })
 }
@@ -216,46 +231,54 @@ func (loop *EventLoop) RunOnLoop(fn func(*goja.Runtime)) {
 func (loop *EventLoop) runAux() {
 	loop.auxJobsLock.Lock()
 	jobs := loop.auxJobs
-	loop.auxJobs = nil
+	loop.auxJobs = loop.auxJobsSpare
 	loop.auxJobsLock.Unlock()
-	for _, job := range jobs {
+	for i, job := range jobs {
 		job()
+		jobs[i] = nil
 	}
+	loop.auxJobsSpare = jobs[:0]
 }
 
 func (loop *EventLoop) run(inBackground bool) {
-	loop.canRun = true
 	loop.runAux()
-
-	for loop.canRun && (inBackground || loop.jobCount > 0) {
+	if inBackground {
+		loop.jobCount++
+	}
+	LOOP:
+	for loop.jobCount > 0 {
 		select {
 		case job := <-loop.jobChan:
 			job()
-			if loop.canRun {
-				select {
-				case <-loop.wakeup:
-					loop.runAux()
-				default:
-				}
-			}
-		case <-loop.wakeup:
+		case <-loop.wakeupChan:
 			loop.runAux()
+			if atomic.LoadInt32(&loop.canRun) == 0 {
+				break LOOP
+			}
 		}
 	}
-	loop.stopCond.L.Lock()
+	if inBackground {
+		loop.jobCount--
+	}
+
+	loop.stopLock.Lock()
 	loop.running = false
-	loop.stopCond.L.Unlock()
+	loop.stopLock.Unlock()
 	loop.stopCond.Broadcast()
+}
+
+func (loop *EventLoop) wakeup() {
+	select {
+	case loop.wakeupChan <- struct{}{}:
+	default:
+	}
 }
 
 func (loop *EventLoop) addAuxJob(fn func()) {
 	loop.auxJobsLock.Lock()
 	loop.auxJobs = append(loop.auxJobs, fn)
 	loop.auxJobsLock.Unlock()
-	select {
-	case loop.wakeup <- struct{}{}:
-	default:
-	}
+	loop.wakeup()
 }
 
 func (loop *EventLoop) addTimeout(f func(), timeout time.Duration) *Timer {
