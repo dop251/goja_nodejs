@@ -405,11 +405,11 @@ func TestEventLoop_StopNoWait(t *testing.T) {
 	loop.Run(func(runtime *goja.Runtime) {
 		loop.SetTimeout(func(*goja.Runtime) {
 			atomic.StoreInt32(&ran, 1)
-		}, 5 * time.Second)
+		}, 5*time.Second)
 
 		loop.SetTimeout(func(*goja.Runtime) {
 			loop.StopNoWait()
-		}, 500 * time.Millisecond)
+		}, 500*time.Millisecond)
 	})
 
 	if atomic.LoadInt32(&ran) != 0 {

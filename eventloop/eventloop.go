@@ -35,7 +35,7 @@ type EventLoop struct {
 	auxJobsLock sync.Mutex
 	wakeupChan  chan struct{}
 
-	auxJobsSpare, auxJobs     []func()
+	auxJobsSpare, auxJobs []func()
 
 	stopLock sync.Mutex
 	stopCond *sync.Cond
@@ -245,7 +245,7 @@ func (loop *EventLoop) run(inBackground bool) {
 	if inBackground {
 		loop.jobCount++
 	}
-	LOOP:
+LOOP:
 	for loop.jobCount > 0 {
 		select {
 		case job := <-loop.jobChan:
