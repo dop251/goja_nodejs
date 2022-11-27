@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
+	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
 )
 
@@ -113,6 +114,27 @@ func TestSetters(t *testing.T) {
 	// Script will throw an error on failed validation
 
 	_, err := vm.RunString(url_test)
+	if err != nil {
+		t.Fatal("Failed to process url script.", err)
+	}
+}
+
+//go:embed test/search_params_test.js
+var search_params_test string
+
+func TestSearchParams(t *testing.T) {
+	vm := goja.New()
+	new(require.Registry).Enable(vm)
+	Enable(vm)
+	console.Enable(vm)
+
+	if c := vm.Get("URL"); c == nil {
+		t.Fatal("URL not found")
+	}
+
+	// Script will throw an error on failed validation
+
+	_, err := vm.RunString(search_params_test)
 	if err != nil {
 		t.Fatal("Failed to process url script.", err)
 	}
