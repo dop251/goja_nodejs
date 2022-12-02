@@ -39,7 +39,7 @@ if (myURL.href != "https://example.org/foo#baz") {
 myURL = new URL('https://example.org:81/foo');
 myURL.host = 'example.com:82';
 if (myURL.href != "https://example.com:82/foo") {
-  throw new Error(`Failed setting hash. got: ${myURL.href}, expected: https://example.com:82/foo`)
+  throw new Error(`Failed setting host. got: ${myURL.href}, expected: https://example.com:82/foo`)
 }
 
 // Hostname
