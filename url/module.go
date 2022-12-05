@@ -11,7 +11,7 @@ import (
 	"github.com/dop251/goja_nodejs/require"
 )
 
-const ModuleName = "node:URL"
+const ModuleName = "node:url"
 
 var reflectTypeURL = reflect.TypeOf((*url.URL)(nil))
 
@@ -40,11 +40,11 @@ func defineURLAccessorProp(r *goja.Runtime, p *goja.Object, name string, getter 
 	p.DefineAccessorProperty(name, getterVal, setterVal, goja.FLAG_FALSE, goja.FLAG_TRUE)
 }
 
-func createURL(r *goja.Runtime) goja.Value {
-	proto := r.NewObject()
+func createURLPrototype(r *goja.Runtime) *goja.Object {
+	p := r.NewObject()
 
 	// host
-	defineURLAccessorProp(r, proto, "host", func(u *url.URL) interface{} {
+	defineURLAccessorProp(r, p, "host", func(u *url.URL) interface{} {
 		return u.Host
 	}, func(u *url.URL, arg goja.Value) {
 		host := arg.String()
@@ -54,7 +54,7 @@ func createURL(r *goja.Runtime) goja.Value {
 	})
 
 	// hash
-	defineURLAccessorProp(r, proto, "hash", func(u *url.URL) interface{} {
+	defineURLAccessorProp(r, p, "hash", func(u *url.URL) interface{} {
 		if u.Fragment != "" {
 			return "#" + u.Fragment
 		}
@@ -64,7 +64,7 @@ func createURL(r *goja.Runtime) goja.Value {
 	})
 
 	// hostname
-	defineURLAccessorProp(r, proto, "hostname", func(u *url.URL) interface{} {
+	defineURLAccessorProp(r, p, "hostname", func(u *url.URL) interface{} {
 		return strings.Split(u.Host, ":")[0]
 	}, func(u *url.URL, arg goja.Value) {
 		h := arg.String()
@@ -75,7 +75,7 @@ func createURL(r *goja.Runtime) goja.Value {
 	})
 
 	// href
-	defineURLAccessorProp(r, proto, "href", func(u *url.URL) interface{} {
+	defineURLAccessorProp(r, p, "href", func(u *url.URL) interface{} {
 		return u.String()
 	}, func(u *url.URL, arg goja.Value) {
 		if url, err := url.ParseRequestURI(arg.String()); err == nil {
@@ -84,7 +84,7 @@ func createURL(r *goja.Runtime) goja.Value {
 	})
 
 	// pathname
-	defineURLAccessorProp(r, proto, "pathname", func(u *url.URL) interface{} {
+	defineURLAccessorProp(r, p, "pathname", func(u *url.URL) interface{} {
 		return u.Path
 	}, func(u *url.URL, arg goja.Value) {
 		p := arg.String()
@@ -94,12 +94,12 @@ func createURL(r *goja.Runtime) goja.Value {
 	})
 
 	// origin
-	defineURLAccessorProp(r, proto, "origin", func(u *url.URL) interface{} {
+	defineURLAccessorProp(r, p, "origin", func(u *url.URL) interface{} {
 		return u.Scheme + "://" + u.Hostname()
 	}, func(u *url.URL, arg goja.Value) { /* noop */ })
 
 	// password
-	defineURLAccessorProp(r, proto, "password", func(u *url.URL) interface{} {
+	defineURLAccessorProp(r, p, "password", func(u *url.URL) interface{} {
 		p, _ := u.User.Password()
 		return p
 	}, func(u *url.URL, arg goja.Value) {
@@ -108,7 +108,7 @@ func createURL(r *goja.Runtime) goja.Value {
 	})
 
 	// username
-	defineURLAccessorProp(r, proto, "username", func(u *url.URL) interface{} {
+	defineURLAccessorProp(r, p, "username", func(u *url.URL) interface{} {
 		return u.User.Username()
 	}, func(u *url.URL, arg goja.Value) {
 		p, has := u.User.Password()
@@ -120,7 +120,7 @@ func createURL(r *goja.Runtime) goja.Value {
 	})
 
 	// port
-	defineURLAccessorProp(r, proto, "port", func(u *url.URL) interface{} {
+	defineURLAccessorProp(r, p, "port", func(u *url.URL) interface{} {
 		return u.Port()
 	}, func(u *url.URL, arg goja.Value) {
 		f, _ := strconv.ParseFloat(arg.String(), 64)
@@ -132,7 +132,7 @@ func createURL(r *goja.Runtime) goja.Value {
 	})
 
 	// protocol
-	defineURLAccessorProp(r, proto, "protocol", func(u *url.URL) interface{} {
+	defineURLAccessorProp(r, p, "protocol", func(u *url.URL) interface{} {
 		return u.Scheme + ":"
 	}, func(u *url.URL, arg goja.Value) {
 		scheme := strings.Replace(arg.String(), ":", "", -1)
@@ -142,7 +142,7 @@ func createURL(r *goja.Runtime) goja.Value {
 	})
 
 	// Search
-	defineURLAccessorProp(r, proto, "search", func(u *url.URL) interface{} {
+	defineURLAccessorProp(r, p, "search", func(u *url.URL) interface{} {
 		s := strings.Split(u.RawQuery, "#")[0]
 		if s != "" {
 			return "?" + s
@@ -156,14 +156,18 @@ func createURL(r *goja.Runtime) goja.Value {
 		u.RawQuery = arg.String() + hash
 	})
 
-	proto.Set("toString", r.ToValue(func(call goja.FunctionCall) goja.Value {
+	p.Set("toString", r.ToValue(func(call goja.FunctionCall) goja.Value {
 		return r.ToValue(toURL(r, call.This).String())
 	}))
 
-	proto.Set("toJSON", r.ToValue(func(call goja.FunctionCall) goja.Value {
+	p.Set("toJSON", r.ToValue(func(call goja.FunctionCall) goja.Value {
 		return r.ToValue(toURL(r, call.This).String())
 	}))
 
+	return p
+}
+
+func createURLConstructor(r *goja.Runtime) goja.Value {
 	f := r.ToValue(func(call goja.ConstructorCall) *goja.Object {
 		var u *url.URL
 		if len(call.Arguments) == 1 {
@@ -188,16 +192,16 @@ func createURL(r *goja.Runtime) goja.Value {
 		return res
 	}).(*goja.Object)
 
-	f.Set("prototype", proto)
+	f.Set("prototype", createURLPrototype(r))
 	return f
 }
 
 func Require(runtime *goja.Runtime, module *goja.Object) {
-	module.Set("exports", createURL(runtime))
+	module.Set("exports", runtime.NewObject()) // Empty object
 }
 
 func Enable(runtime *goja.Runtime) {
-	runtime.Set("URL", require.Require(runtime, ModuleName))
+	runtime.Set("URL", createURLConstructor(runtime))
 }
 
 func init() {
