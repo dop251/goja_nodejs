@@ -197,11 +197,12 @@ func createURLConstructor(r *goja.Runtime) goja.Value {
 }
 
 func Require(runtime *goja.Runtime, module *goja.Object) {
-	module.Set("exports", runtime.NewObject()) // Empty object
+	exports := module.Get("exports").(*goja.Object)
+	exports.Set("URL", createURLConstructor(runtime))
 }
 
 func Enable(runtime *goja.Runtime) {
-	runtime.Set("URL", createURLConstructor(runtime))
+	runtime.Set("URL", require.Require(runtime, ModuleName).ToObject(runtime).Get("URL"))
 }
 
 func init() {
