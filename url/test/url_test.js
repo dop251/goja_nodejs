@@ -86,8 +86,8 @@ if (myURL.href != "https://example.org:1234") {
   throw new Error(`Failed setting port. got: ${myURL.href}, expected: https://example.org:1234`)
 }
 myURL.port = 123456789;
-if (myURL.href != "https://example.org:65535") {
-  throw new Error(`Failed setting port. got: ${myURL.href}, expected: https://example.org:65535`)
+if (myURL.href != "https://example.org:1234") {
+  throw new Error(`Failed setting port. got: ${myURL.href}, expected: https://example.org:1234`)
 }
 
 // Protocol

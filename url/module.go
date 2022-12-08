@@ -2,9 +2,9 @@ package url
 
 import (
 	"fmt"
+	"math"
 	"net/url"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -123,12 +123,11 @@ func createURLPrototype(r *goja.Runtime) *goja.Object {
 	defineURLAccessorProp(r, p, "port", func(u *url.URL) interface{} {
 		return u.Port()
 	}, func(u *url.URL, arg goja.Value) {
-		f, _ := strconv.ParseFloat(arg.String(), 64)
-		max := ^uint16(0) // 65535
-		if f > float64(max) {
-			f = float64(max)
+		if arg.String() == "" {
+			u.Host = u.Hostname() // clear port
+		} else if num := arg.ToInteger(); num >= 0 && num <= math.MaxUint16 {
+			u.Host = u.Hostname() + ":" + fmt.Sprintf("%d", num)
 		}
-		u.Host = u.Hostname() + ":" + fmt.Sprintf("%d", int(f))
 	})
 
 	// protocol
