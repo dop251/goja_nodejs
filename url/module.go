@@ -16,9 +16,19 @@ import (
 
 const ModuleName = "node:url"
 
-var reflectTypeURL = reflect.TypeOf((*url.URL)(nil))
-var nonAlphanumericRegex = regexp.MustCompile(`[^0-9]`)
-var invalidPortErr = errors.New("Invalid port assignment")
+var (
+	reflectTypeURL       = reflect.TypeOf((*url.URL)(nil))
+	nonAlphanumericRegex = regexp.MustCompile(`[^0-9]`)
+	errInvalidPort       = errors.New("invalid port assignment")
+	reservedPorts        = map[string]string{
+		"ftp":   "21",
+		"file":  "",
+		"http":  "80",
+		"https": "443",
+		"ws":    "80",
+		"wss":   "443",
+	}
+)
 
 func toURL(r *goja.Runtime, v goja.Value) *url.URL {
 	if v.ExportType() == reflectTypeURL {
@@ -175,20 +185,9 @@ func createURLPrototype(r *goja.Runtime) *goja.Object {
 }
 
 func parsePort(s string, v goja.Value) (string, error) {
-	// List of reserved schemes with default ports. We remove the port if explicitly set
-	// to the default.
-	reserved := map[string]string{
-		"ftp":   "21",
-		"file":  "",
-		"http":  "80",
-		"https": "443",
-		"ws":    "80",
-		"wss":   "443",
-	}
-
 	// Clear for empty string, or reserved ports
 	str := v.String()
-	if str == "" || reserved[s] == str {
+	if str == "" || reservedPorts[s] == str {
 		return "", nil
 	}
 
@@ -197,12 +196,12 @@ func parsePort(s string, v goja.Value) (string, error) {
 	t = nonAlphanumericRegex.ReplaceAllString(t, " ")
 	t = strings.Split(t, " ")[0]
 	if t == "" {
-		return "", invalidPortErr
+		return "", errInvalidPort
 	}
 
 	i, err := strconv.Atoi(t)
 	if err != nil {
-		return "", invalidPortErr
+		return "", errInvalidPort
 	}
 
 	// Port bounds
@@ -210,7 +209,7 @@ func parsePort(s string, v goja.Value) (string, error) {
 		return fmt.Sprintf("%d", i), nil
 	}
 
-	return "", invalidPortErr
+	return "", errInvalidPort
 }
 
 func createURLConstructor(r *goja.Runtime) goja.Value {
