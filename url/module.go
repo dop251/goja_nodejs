@@ -1,10 +1,13 @@
 package url
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"net/url"
 	"reflect"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -14,6 +17,8 @@ import (
 const ModuleName = "node:url"
 
 var reflectTypeURL = reflect.TypeOf((*url.URL)(nil))
+var nonAlphanumericRegex = regexp.MustCompile(`[^0-9]`)
+var invalidPortErr = errors.New("Invalid port assignment")
 
 func toURL(r *goja.Runtime, v goja.Value) *url.URL {
 	if v.ExportType() == reflectTypeURL {
@@ -123,11 +128,14 @@ func createURLPrototype(r *goja.Runtime) *goja.Object {
 	defineURLAccessorProp(r, p, "port", func(u *url.URL) interface{} {
 		return u.Port()
 	}, func(u *url.URL, arg goja.Value) {
-		if arg.String() == "" {
-			u.Host = u.Hostname() // clear port
-		} else if num := arg.ToInteger(); num >= 0 && num <= math.MaxUint16 {
-			u.Host = u.Hostname() + ":" + fmt.Sprintf("%d", num)
+		if p, err := parsePort(u.Scheme, arg); err == nil {
+			if p == "" {
+				u.Host = u.Hostname()
+			} else {
+				u.Host = u.Hostname() + ":" + p
+			}
 		}
+		// Ignore invalid values
 	})
 
 	// protocol
@@ -164,6 +172,45 @@ func createURLPrototype(r *goja.Runtime) *goja.Object {
 	}))
 
 	return p
+}
+
+func parsePort(s string, v goja.Value) (string, error) {
+	// List of reserved schemes with default ports. We remove the port if explicitly set
+	// to the default.
+	reserved := map[string]string{
+		"ftp":   "21",
+		"file":  "",
+		"http":  "80",
+		"https": "443",
+		"ws":    "80",
+		"wss":   "443",
+	}
+
+	// Clear for empty string, or reserved ports
+	str := v.String()
+	if str == "" || reserved[s] == str {
+		return "", nil
+	}
+
+	// Remove non-alphanumerics
+	t := strings.Trim(str, " ")
+	t = nonAlphanumericRegex.ReplaceAllString(t, " ")
+	t = strings.Split(t, " ")[0]
+	if t == "" {
+		return "", invalidPortErr
+	}
+
+	i, err := strconv.Atoi(t)
+	if err != nil {
+		return "", invalidPortErr
+	}
+
+	// Port bounds
+	if i >= 0 && i < math.MaxUint16 {
+		return fmt.Sprintf("%d", i), nil
+	}
+
+	return "", invalidPortErr
 }
 
 func createURLConstructor(r *goja.Runtime) goja.Value {

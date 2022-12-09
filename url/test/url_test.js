@@ -73,21 +73,39 @@ if (myURL.href != "https://example.org/abcdef?123") {
 
 // port
 myURL = new URL('https://example.org:8888');
-myURL.port = 1111;
-if (myURL.href != "https://example.org:1111") {
-  throw new Error(`Failed setting port. got: ${myURL.href}, expected: https://example.org:1111`)
+if (myURL.port != "8888") {
+  throw new Error(`Failed setting port. got: ${myURL.port}, expected: 8888`)
 }
-myURL.port = "2222";
-if (myURL.href != "https://example.org:2222") {
-  throw new Error(`Failed setting port. got: ${myURL.href}, expected: https://example.org:2222`)
+// Default ports are automatically transformed to the empty string
+// (HTTPS protocol's default port is 443)
+myURL.port = "443";
+if (myURL.port != "") {
+  throw new Error(`Failed setting port. got: ${myURL.port}, expected: ""`)
 }
+myURL.port = 1234;
+if (myURL.port != "1234") {
+  throw new Error(`Failed setting port. got: ${myURL.port}, expected: "1234"`)
+}
+// Completely invalid port strings are ignored
+myURL.port = 'abcd';
+if (myURL.port != "1234") {
+  throw new Error(`Failed setting port. got: ${myURL.port}, expected: "1234"`)
+}
+// Leading numbers are treated as a port number
+myURL.port = '5678abcd';
+if (myURL.port != "5678") {
+  throw new Error(`Failed setting port. got: ${myURL.port}, expected: "5678"`)
+}
+// Non-integers are truncated
 myURL.port = 1234.5678;
-if (myURL.href != "https://example.org:1234") {
-  throw new Error(`Failed setting port. got: ${myURL.href}, expected: https://example.org:1234`)
+if (myURL.port != "1234") {
+  throw new Error(`Failed setting port. got: ${myURL.port}, expected: "1234"`)
 }
-myURL.port = 123456789;
-if (myURL.href != "https://example.org:1234") {
-  throw new Error(`Failed setting port. got: ${myURL.href}, expected: https://example.org:1234`)
+// Out-of-range numbers which are not represented in scientific notation
+// will be ignored.
+myURL.port = 1e10;
+if (myURL.port != "1234") {
+  throw new Error(`Failed setting port. got: ${myURL.port}, expected: "1234"`)
 }
 
 // Protocol
