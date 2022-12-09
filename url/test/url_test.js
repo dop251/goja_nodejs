@@ -107,6 +107,10 @@ myURL.port = 1e10;
 if (myURL.port != "1234") {
   throw new Error(`Failed setting port. got: ${myURL.port}, expected: "1234"`)
 }
+myURL.port = 4.567e21;
+if (myURL.port != "4") {
+  throw new Error(`Failed setting port. got: ${myURL.port}, expected: "4"`)
+}
 
 // Protocol
 myURL = new URL('https://example.org');
