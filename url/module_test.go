@@ -98,10 +98,10 @@ func TestGetters(t *testing.T) {
 	}
 }
 
-//go:embed test/url_test.js
-var url_test string
+//go:embed testdata/url_test.js
+var urlTest string
 
-func TestSetters(t *testing.T) {
+func TestJs(t *testing.T) {
 	vm := goja.New()
 	new(require.Registry).Enable(vm)
 	Enable(vm)
@@ -112,8 +112,11 @@ func TestSetters(t *testing.T) {
 
 	// Script will throw an error on failed validation
 
-	_, err := vm.RunString(url_test)
+	_, err := vm.RunScript("testdata/url_test.js", urlTest)
 	if err != nil {
+		if ex, ok := err.(*goja.Exception); ok {
+			t.Fatal(ex.String())
+		}
 		t.Fatal("Failed to process url script.", err)
 	}
 }

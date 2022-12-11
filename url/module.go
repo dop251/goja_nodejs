@@ -1,14 +1,13 @@
 package url
 
 import (
-	"errors"
-	"fmt"
 	"math"
 	"net/url"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
+
+	"golang.org/x/net/idna"
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/require"
@@ -17,18 +16,87 @@ import (
 const ModuleName = "node:url"
 
 var (
-	reflectTypeURL       = reflect.TypeOf((*url.URL)(nil))
-	nonAlphanumericRegex = regexp.MustCompile(`[^0-9]`)
-	errInvalidPort       = errors.New("invalid port assignment")
-	reservedPorts        = map[string]string{
-		"ftp":   "21",
-		"file":  "",
-		"http":  "80",
-		"https": "443",
-		"ws":    "80",
-		"wss":   "443",
-	}
+	reflectTypeURL = reflect.TypeOf((*url.URL)(nil))
+	reflectTypeInt = reflect.TypeOf(0)
 )
+
+func isDefaultURLPort(protocol string, port int) bool {
+	switch port {
+	case 21:
+		if protocol == "ftp" {
+			return true
+		}
+	case 80:
+		if protocol == "http" || protocol == "ws" {
+			return true
+		}
+	case 443:
+		if protocol == "https" || protocol == "wss" {
+			return true
+		}
+	}
+	return false
+}
+
+func isSpecialProtocol(protocol string) bool {
+	switch protocol {
+	case "ftp", "file", "http", "https", "ws", "wss":
+		return true
+	}
+	return false
+}
+
+func clearURLPort(u *url.URL) {
+	u.Host = u.Hostname()
+}
+
+func valueToURLPort(v goja.Value) (portNum int, empty bool) {
+	portNum = -1
+	if et := v.ExportType(); et == reflectTypeInt {
+		if num := v.ToInteger(); num >= 0 && num <= math.MaxUint16 {
+			portNum = int(num)
+		}
+	} else {
+		s := v.String()
+		if s == "" {
+			return 0, true
+		}
+		for i := 0; i < len(s); i++ {
+			if c := s[i]; c >= '0' && c <= '9' {
+				if portNum == -1 {
+					portNum = 0
+				}
+				portNum = portNum*10 + int(c-'0')
+				if portNum > math.MaxUint16 {
+					portNum = -1
+					break
+				}
+			} else {
+				break
+			}
+		}
+	}
+	return
+}
+
+func setURLPort(u *url.URL, v goja.Value) {
+	if u.Scheme == "file" {
+		return
+	}
+	portNum, empty := valueToURLPort(v)
+	if empty {
+		clearURLPort(u)
+		return
+	}
+	if portNum == -1 {
+		return
+	}
+	if isDefaultURLPort(u.Scheme, portNum) {
+		clearURLPort(u)
+	} else {
+		u.Host = u.Hostname() + ":" + strconv.Itoa(portNum)
+	}
+}
 
 func toURL(r *goja.Runtime, v goja.Value) *url.URL {
 	if v.ExportType() == reflectTypeURL {
@@ -65,17 +133,22 @@ func createURLPrototype(r *goja.Runtime) *goja.Object {
 		host := arg.String()
 		if _, err := url.ParseRequestURI(u.Scheme + "://" + host); err == nil {
 			u.Host = host
+			fixURL(r, u)
 		}
 	})
 
 	// hash
 	defineURLAccessorProp(r, p, "hash", func(u *url.URL) interface{} {
 		if u.Fragment != "" {
-			return "#" + u.Fragment
+			return "#" + u.EscapedFragment()
 		}
 		return ""
 	}, func(u *url.URL, arg goja.Value) {
-		u.Fragment = strings.Replace(arg.String(), "#", "", 1)
+		h := arg.String()
+		if len(h) > 0 && h[0] == '#' {
+			h = h[1:]
+		}
+		u.Fragment = h
 	})
 
 	// hostname
@@ -83,9 +156,16 @@ func createURLPrototype(r *goja.Runtime) *goja.Object {
 		return strings.Split(u.Host, ":")[0]
 	}, func(u *url.URL, arg goja.Value) {
 		h := arg.String()
+		if strings.IndexByte(h, ':') >= 0 {
+			return
+		}
 		if _, err := url.ParseRequestURI(u.Scheme + "://" + h); err == nil {
-			hostname := strings.Split(h, ":")[0]
-			u.Host = hostname + ":" + u.Port()
+			if port := u.Port(); port != "" {
+				u.Host = h + ":" + port
+			} else {
+				u.Host = h
+			}
+			fixURL(r, u)
 		}
 	})
 
@@ -93,17 +173,22 @@ func createURLPrototype(r *goja.Runtime) *goja.Object {
 	defineURLAccessorProp(r, p, "href", func(u *url.URL) interface{} {
 		return u.String()
 	}, func(u *url.URL, arg goja.Value) {
-		if url, err := url.ParseRequestURI(arg.String()); err == nil {
-			*u = *url
-		}
+		url := parseURL(r, arg.String(), true)
+		*u = *url
 	})
 
 	// pathname
 	defineURLAccessorProp(r, p, "pathname", func(u *url.URL) interface{} {
-		return u.Path
+		return u.EscapedPath()
 	}, func(u *url.URL, arg goja.Value) {
 		p := arg.String()
 		if _, err := url.Parse(p); err == nil {
+			switch u.Scheme {
+			case "https", "http", "ftp", "ws", "wss":
+				if !strings.HasPrefix(p, "/") {
+					p = "/" + p
+				}
+			}
 			u.Path = p
 		}
 	})
@@ -111,7 +196,7 @@ func createURLPrototype(r *goja.Runtime) *goja.Object {
 	// origin
 	defineURLAccessorProp(r, p, "origin", func(u *url.URL) interface{} {
 		return u.Scheme + "://" + u.Hostname()
-	}, func(u *url.URL, arg goja.Value) { /* noop */ })
+	}, nil)
 
 	// password
 	defineURLAccessorProp(r, p, "password", func(u *url.URL) interface{} {
@@ -138,39 +223,35 @@ func createURLPrototype(r *goja.Runtime) *goja.Object {
 	defineURLAccessorProp(r, p, "port", func(u *url.URL) interface{} {
 		return u.Port()
 	}, func(u *url.URL, arg goja.Value) {
-		if p, err := parsePort(u.Scheme, arg); err == nil {
-			if p == "" {
-				u.Host = u.Hostname()
-			} else {
-				u.Host = u.Hostname() + ":" + p
-			}
-		}
-		// Ignore invalid values
+		setURLPort(u, arg)
 	})
 
 	// protocol
 	defineURLAccessorProp(r, p, "protocol", func(u *url.URL) interface{} {
 		return u.Scheme + ":"
 	}, func(u *url.URL, arg goja.Value) {
-		scheme := strings.Replace(arg.String(), ":", "", -1)
-		if _, err := url.ParseRequestURI(scheme + "://" + u.Host); err == nil {
-			u.Scheme = scheme
+		s := arg.String()
+		pos := strings.IndexByte(s, ':')
+		if pos >= 0 {
+			s = s[:pos]
+		}
+		s = strings.ToLower(s)
+		if isSpecialProtocol(u.Scheme) == isSpecialProtocol(s) {
+			if _, err := url.ParseRequestURI(s + "://" + u.Host); err == nil {
+				u.Scheme = s
+			}
 		}
 	})
 
 	// Search
 	defineURLAccessorProp(r, p, "search", func(u *url.URL) interface{} {
-		s := strings.Split(u.RawQuery, "#")[0]
-		if s != "" {
-			return "?" + s
+		if u.RawQuery != "" {
+			return "?" + u.RawQuery
 		}
 		return ""
 	}, func(u *url.URL, arg goja.Value) {
-		hash := ""
-		if u.Fragment != "" {
-			hash = "#" + u.Fragment
-		}
-		u.RawQuery = arg.String() + hash
+		u.RawQuery = arg.String()
+		fixRawQuery(u)
 	})
 
 	p.Set("toString", r.ToValue(func(call goja.FunctionCall) goja.Value {
@@ -184,54 +265,82 @@ func createURLPrototype(r *goja.Runtime) *goja.Object {
 	return p
 }
 
-func parsePort(s string, v goja.Value) (string, error) {
-	// Clear for empty string, or reserved ports
-	str := v.String()
-	if str == "" || reservedPorts[s] == str {
-		return "", nil
-	}
+const (
+	URLNotAbsolute  = "URL is not absolute"
+	InvalidURL      = "Invalid URL"
+	InvalidBaseURL  = "Invalid base URL"
+	InvalidHostname = "Invalid hostname"
+)
 
-	// Remove non-alphanumerics
-	t := strings.Trim(str, " ")
-	t = nonAlphanumericRegex.ReplaceAllString(t, " ")
-	t = strings.Split(t, " ")[0]
-	if t == "" {
-		return "", errInvalidPort
-	}
+func newInvalidURLError(r *goja.Runtime, msg, input string) *goja.Object {
+	// when node's error module is added this should return a NodeError
+	o := r.NewTypeError(msg)
+	o.Set("input", r.ToValue(input))
+	return o
+}
 
-	i, err := strconv.Atoi(t)
+func fixRawQuery(u *url.URL) {
+	if u.RawQuery != "" {
+		var u1 url.URL
+		u1.Fragment = u.RawQuery
+		u.RawQuery = u1.EscapedFragment()
+	}
+}
+
+func fixURL(r *goja.Runtime, u *url.URL) {
+	switch u.Scheme {
+	case "https", "http", "ftp", "wss", "ws":
+		if u.Path == "" {
+			u.Path = "/"
+		}
+		hostname := u.Hostname()
+		lh := strings.ToLower(hostname)
+		ch, err := idna.Punycode.ToASCII(lh)
+		if err != nil {
+			panic(newInvalidURLError(r, InvalidHostname, lh))
+		}
+		if ch != hostname {
+			if port := u.Port(); port != "" {
+				u.Host = ch + ":" + port
+			} else {
+				u.Host = ch
+			}
+		}
+		fixRawQuery(u)
+	}
+}
+
+func parseURL(r *goja.Runtime, s string, isBase bool) *url.URL {
+	u, err := url.Parse(s)
 	if err != nil {
-		return "", errInvalidPort
+		if isBase {
+			panic(newInvalidURLError(r, InvalidBaseURL, s))
+		} else {
+			panic(newInvalidURLError(r, InvalidURL, s))
+		}
 	}
-
-	// Port bounds
-	if i >= 0 && i < math.MaxUint16 {
-		return fmt.Sprintf("%d", i), nil
+	if isBase && !u.IsAbs() {
+		panic(newInvalidURLError(r, URLNotAbsolute, s))
 	}
-
-	return "", errInvalidPort
+	if portStr := u.Port(); portStr != "" {
+		if port, err := strconv.Atoi(portStr); err != nil || isDefaultURLPort(u.Scheme, port) {
+			clearURLPort(u)
+		}
+	}
+	fixURL(r, u)
+	return u
 }
 
 func createURLConstructor(r *goja.Runtime) goja.Value {
 	f := r.ToValue(func(call goja.ConstructorCall) *goja.Object {
 		var u *url.URL
-		if len(call.Arguments) == 1 {
-			if url, err := url.ParseRequestURI(call.Arguments[0].String()); err != nil {
-				panic(r.NewTypeError("Failed to construct 'URL': Invalid URL"))
-			} else {
-				u, _ = url.Parse(call.Arguments[0].String())
-			}
+		if baseArg := call.Argument(1); !goja.IsUndefined(baseArg) {
+			base := parseURL(r, baseArg.String(), true)
+			ref := parseURL(r, call.Arguments[0].String(), false)
+			u = base.ResolveReference(ref)
 		} else {
-			if _, err := url.ParseRequestURI(call.Arguments[1].String()); err != nil {
-				panic(r.NewTypeError("Failed to construct 'URL': Invalid base URL"))
-			} else if input, err := url.Parse(call.Arguments[0].String()); err != nil {
-				panic(r.NewTypeError("Failed to construct 'URL': Invalid URL"))
-			} else {
-				base, _ := url.Parse(call.Arguments[1].String())
-				u = base.ResolveReference(input)
-			}
+			u = parseURL(r, call.Argument(0).String(), true)
 		}
-
 		res := r.ToValue(u).(*goja.Object)
 		res.SetPrototype(call.This.Prototype())
 		return res
