@@ -32,6 +32,8 @@ type EventLoop struct {
 	jobCount int32
 	canRun   int32
 
+	jobDoneCallback func()
+
 	auxJobsLock sync.Mutex
 	wakeupChan  chan struct{}
 
@@ -89,6 +91,16 @@ func EnableConsole(enableConsole bool) Option {
 func WithRegistry(registry *require.Registry) Option {
 	return func(loop *EventLoop) {
 		loop.registry = registry
+	}
+}
+
+// WithJobDoneCallback
+// Called when the next job will not be executed
+// Occurs when all jobs have completed or EventLoop.Stop is called
+// If EventLoop.Start is executed multiple times, the callback will be called repeatedly
+func WithJobDoneCallback(fn func()) Option {
+	return func(loop *EventLoop) {
+		loop.jobDoneCallback = fn
 	}
 }
 
@@ -228,6 +240,10 @@ func (loop *EventLoop) RunOnLoop(fn func(*goja.Runtime)) {
 	loop.addAuxJob(func() { fn(loop.vm) })
 }
 
+func (loop *EventLoop) JobRemainCount() int32 {
+	return loop.jobCount
+}
+
 func (loop *EventLoop) runAux() {
 	loop.auxJobsLock.Lock()
 	jobs := loop.auxJobs
@@ -265,6 +281,9 @@ LOOP:
 	loop.running = false
 	loop.stopLock.Unlock()
 	loop.stopCond.Broadcast()
+	if loop.jobDoneCallback != nil {
+		go loop.jobDoneCallback()
+	}
 }
 
 func (loop *EventLoop) wakeup() {
