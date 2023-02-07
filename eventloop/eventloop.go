@@ -200,7 +200,7 @@ func (loop *EventLoop) Start() {
 // It is not allowed to call Stop() from the loop, because it is synchronous and cannot complete until the loop
 // is not running any jobs. Use StopNoWait() instead.
 // return number of jobs remaining
-func (loop *EventLoop) Stop() int32 {
+func (loop *EventLoop) Stop() int {
 	loop.stopLock.Lock()
 	for loop.running {
 		atomic.StoreInt32(&loop.canRun, 0)
@@ -208,20 +208,18 @@ func (loop *EventLoop) Stop() int32 {
 		loop.stopCond.Wait()
 	}
 	loop.stopLock.Unlock()
-	return loop.jobCount
+	return int(loop.jobCount)
 }
 
 // StopNoWait tells the loop to stop and returns immediately. Can be used inside the loop. Calling it on a
 // non-running loop has no effect.
-// return number of jobs remaining
-func (loop *EventLoop) StopNoWait() int32 {
+func (loop *EventLoop) StopNoWait() {
 	loop.stopLock.Lock()
 	if loop.running {
 		atomic.StoreInt32(&loop.canRun, 0)
 		loop.wakeup()
 	}
 	loop.stopLock.Unlock()
-	return loop.jobCount
 }
 
 // RunOnLoop schedules to run the specified function in the context of the loop as soon as possible.
