@@ -40,6 +40,8 @@ func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
 		module, err = r.loadNative(origPath)
 		if err == nil {
 			return
+		} else {
+			err = nil
 		}
 		if module = r.nodeModules[p]; module != nil {
 			return
