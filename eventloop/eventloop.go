@@ -26,6 +26,10 @@ type Interval struct {
 	stopChan chan struct{}
 }
 
+type Immediate struct {
+	job
+}
+
 type EventLoop struct {
 	vm       *goja.Runtime
 	jobChan  chan func()
@@ -68,8 +72,10 @@ func NewEventLoop(opts ...Option) *EventLoop {
 	}
 	vm.Set("setTimeout", loop.setTimeout)
 	vm.Set("setInterval", loop.setInterval)
+	vm.Set("setImmediate", loop.setImmediate)
 	vm.Set("clearTimeout", loop.clearTimeout)
 	vm.Set("clearInterval", loop.clearInterval)
+	vm.Set("clearImmediate", loop.clearImmediate)
 
 	return loop
 }
@@ -116,6 +122,19 @@ func (loop *EventLoop) setTimeout(call goja.FunctionCall) goja.Value {
 
 func (loop *EventLoop) setInterval(call goja.FunctionCall) goja.Value {
 	return loop.schedule(call, true)
+}
+
+func (loop *EventLoop) setImmediate(call goja.FunctionCall) goja.Value {
+	if fn, ok := goja.AssertFunction(call.Argument(0)); ok {
+		var args []goja.Value
+		if len(call.Arguments) > 1 {
+			args = append(args, call.Arguments[1:]...)
+		}
+		f := func() { fn(nil, args...) }
+		loop.jobCount++
+		return loop.vm.ToValue(loop.addImmediate(f))
+	}
+	return nil
 }
 
 // SetTimeout schedules to run the specified function in the context
@@ -312,6 +331,16 @@ func (loop *EventLoop) addInterval(f func(), timeout time.Duration) *Interval {
 	return i
 }
 
+func (loop *EventLoop) addImmediate(f func()) *Immediate {
+	i := &Immediate{
+		job: job{fn: f},
+	}
+	loop.addAuxJob(func() {
+		loop.doImmediate(i)
+	})
+	return i
+}
+
 func (loop *EventLoop) doTimeout(t *Timer) {
 	if !t.cancelled {
 		t.fn()
@@ -323,6 +352,14 @@ func (loop *EventLoop) doTimeout(t *Timer) {
 func (loop *EventLoop) doInterval(i *Interval) {
 	if !i.cancelled {
 		i.fn()
+	}
+}
+
+func (loop *EventLoop) doImmediate(i *Immediate) {
+	if !i.cancelled {
+		i.fn()
+		i.cancelled = true
+		loop.jobCount--
 	}
 }
 
@@ -338,6 +375,13 @@ func (loop *EventLoop) clearInterval(i *Interval) {
 	if i != nil && !i.cancelled {
 		i.cancelled = true
 		close(i.stopChan)
+		loop.jobCount--
+	}
+}
+
+func (loop *EventLoop) clearImmediate(i *Immediate) {
+	if i != nil && !i.cancelled {
+		i.cancelled = true
 		loop.jobCount--
 	}
 }
