@@ -57,12 +57,40 @@ func TestInterval(t *testing.T) {
 	t.Parallel()
 	const SCRIPT = `
 	var count = 0;
-	var t = setInterval(function() {
+	var t = setInterval(function(times) {
 		console.log("tick");
-		if (++count > 2) {
+		if (++count > times) {
 			clearInterval(t);
 		}
-	}, 1000);
+	}, 1000, 2);
+	console.log("Started");
+	`
+
+	loop := NewEventLoop()
+	prg, err := goja.Compile("main.js", SCRIPT, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loop.Run(func(vm *goja.Runtime) {
+		vm.RunProgram(prg)
+	})
+}
+
+func TestImmediate(t *testing.T) {
+	t.Parallel()
+	const SCRIPT = `
+	var cb = function(arg) {
+		console.log(arg);
+	}
+	var i;
+	var t = setImmediate(function() {
+		console.log("tick");
+		setImmediate(cb, "tick 2");
+		i = setImmediate(cb, "should not run")
+	});
+	setImmediate(function() {
+		clearImmediate(i);
+	});
 	console.log("Started");
 	`
 
