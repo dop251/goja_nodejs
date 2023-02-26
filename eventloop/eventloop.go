@@ -103,7 +103,7 @@ func (loop *EventLoop) schedule(call goja.FunctionCall, repeating bool) goja.Val
 		delay := call.Argument(1).ToInteger()
 		var args []goja.Value
 		if len(call.Arguments) > 2 {
-			args = call.Arguments[2:]
+			args = append(args, call.Arguments[2:]...)
 		}
 		f := func() { fn(nil, args...) }
 		loop.jobCount++

@@ -57,12 +57,12 @@ func TestInterval(t *testing.T) {
 	t.Parallel()
 	const SCRIPT = `
 	var count = 0;
-	var t = setInterval(function() {
+	var t = setInterval(function(times) {
 		console.log("tick");
-		if (++count > 2) {
+		if (++count > times) {
 			clearInterval(t);
 		}
-	}, 1000);
+	}, 1000, 2);
 	console.log("Started");
 	`
 
