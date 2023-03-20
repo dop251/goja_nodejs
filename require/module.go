@@ -2,6 +2,8 @@ package require
 
 import (
 	"errors"
+	"io"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -113,23 +115,29 @@ func (r *Registry) RegisterNativeModule(name string, loader ModuleLoader) {
 // DefaultSourceLoader is used if none was set (see WithLoader()). It simply loads files from the host's filesystem.
 func DefaultSourceLoader(filename string) ([]byte, error) {
 	fp := filepath.FromSlash(filename)
-	data, err := os.ReadFile(fp)
+	f, err := os.Open(fp)
 	if err != nil {
-		if os.IsNotExist(err) || errors.Is(err, syscall.EISDIR) {
+		if errors.Is(err, fs.ErrNotExist) {
 			err = ModuleFileDoesNotExistError
 		} else if runtime.GOOS == "windows" {
 			if errors.Is(err, syscall.Errno(0x7b)) { // ERROR_INVALID_NAME, The filename, directory name, or volume label syntax is incorrect.
 				err = ModuleFileDoesNotExistError
-			} else {
-				// temporary workaround for https://github.com/dop251/goja_nodejs/issues/21
-				fi, err1 := os.Stat(fp)
-				if err1 == nil && fi.IsDir() {
-					err = ModuleFileDoesNotExistError
-				}
 			}
 		}
+		return nil, err
 	}
-	return data, err
+
+	defer f.Close()
+	// On some systems (e.g. plan9 and FreeBSD) it is possible to use the standard read() call on directories
+	// which means we cannot rely on read() returning an error, we have to do stat() instead.
+	if fi, err := f.Stat(); err == nil {
+		if fi.IsDir() {
+			return nil, ModuleFileDoesNotExistError
+		}
+	} else {
+		return nil, err
+	}
+	return io.ReadAll(f)
 }
 
 func (r *Registry) getSource(p string) ([]byte, error) {
