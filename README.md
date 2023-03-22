@@ -20,11 +20,11 @@ func main() {
     req := registry.Enable(runtime)
 
     runtime.RunString(`
-    var m = require("m.js");
+    var m = require("./m.js");
     m.test();
     `)
 
-    m, err := req.Require("m.js")
+    m, err := req.Require("./m.js")
     _, _ = m, err
 }
 ```
