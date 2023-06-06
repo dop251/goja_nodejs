@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 const assert = require("../../assert.js");
 
@@ -15,7 +15,7 @@ testURLCtorBase("/foo", "https://example.org/", "https://example.org/foo");
 testURLCtorBase("http://Example.com/", "https://example.org/", "http://example.com/");
 testURLCtorBase("https://Example.com/", "https://example.org/", "https://example.com/");
 testURLCtorBase("foo://Example.com/", "https://example.org/", "foo://Example.com/");
-testURLCtorBase('foo:Example.com/', 'https://example.org/', "foo:Example.com/");
+testURLCtorBase("foo:Example.com/", "https://example.org/", "foo:Example.com/");
 testURLCtorBase("#hash", "https://example.org/", "https://example.org/#hash");
 
 testURLCtor("HTTP://test.com", "http://test.com/");
@@ -32,8 +32,8 @@ assert.throws(() => new URL("ssh://EEE:ddd"), TypeError);
 let myURL;
 
 // Hash
-myURL = new URL('https://example.org/foo#bar');
-myURL.hash = 'baz';
+myURL = new URL("https://example.org/foo#bar");
+myURL.hash = "baz";
 assert.sameValue(myURL.href, "https://example.org/foo#baz");
 
 myURL.hash = "#baz";
@@ -50,31 +50,31 @@ assert.sameValue(myURL.search, "");
 //assert.sameValue(myURL.hash, "#a/#b");
 
 // Host
-myURL = new URL('https://example.org:81/foo');
-myURL.host = 'example.com:82';
+myURL = new URL("https://example.org:81/foo");
+myURL.host = "example.com:82";
 assert.sameValue(myURL.href, "https://example.com:82/foo");
 
 // Hostname
-myURL = new URL('https://example.org:81/foo');
-myURL.hostname = 'example.com:82';
+myURL = new URL("https://example.org:81/foo");
+myURL.hostname = "example.com:82";
 assert.sameValue(myURL.href, "https://example.org:81/foo");
 
 myURL.hostname = "á.com";
 assert.sameValue(myURL.href, "https://xn--1ca.com:81/foo");
 
 // href
-myURL = new URL('https://example.org/foo');
-myURL.href = 'https://example.com/bar';
+myURL = new URL("https://example.org/foo");
+myURL.href = "https://example.com/bar";
 assert.sameValue(myURL.href, "https://example.com/bar");
 
 // Password
-myURL = new URL('https://abc:xyz@example.com');
-myURL.password = '123';
+myURL = new URL("https://abc:xyz@example.com");
+myURL.password = "123";
 assert.sameValue(myURL.href, "https://abc:123@example.com/");
 
 // pathname
-myURL = new URL('https://example.org/abc/xyz?123');
-myURL.pathname = '/abcdef';
+myURL = new URL("https://example.org/abc/xyz?123");
+myURL.pathname = "/abcdef";
 assert.sameValue(myURL.href, "https://example.org/abcdef?123");
 
 myURL.pathname = "";
@@ -84,10 +84,9 @@ myURL.pathname = "á";
 assert.sameValue(myURL.pathname, "/%C3%A1");
 assert.sameValue(myURL.href, "https://example.org/%C3%A1?123");
 
-
 // port
 
-myURL = new URL('https://example.org:8888');
+myURL = new URL("https://example.org:8888");
 assert.sameValue(myURL.port, "8888");
 
 function testSetPort(port, expected) {
@@ -119,8 +118,8 @@ testSetPort(-Infinity, "8888");
 testSetPort(NaN, "8888");
 
 // Leading numbers are treated as a port number
-testSetPort('5678abcd', "5678");
-testSetPort('a5678abcd', "8888");
+testSetPort("5678abcd", "5678");
+testSetPort("a5678abcd", "8888");
 
 // Non-integers are truncated
 testSetPort(1234.5678, "1234");
@@ -133,15 +132,17 @@ testSetPort(123456, "8888");
 testSetPort(4.567e21, "4");
 
 // toString() takes precedence over valueOf(), even if it returns a valid integer
-testSetPort({
-  toString() {
-    return "2";
+testSetPort(
+  {
+    toString() {
+      return "2";
+    },
+    valueOf() {
+      return 1;
+    },
   },
-  valueOf() {
-    return 1;
-  }
-}, "2");
-
+  "2"
+);
 
 // Protocol
 function testSetProtocol(url, protocol, expected) {
@@ -158,11 +159,11 @@ testSetProtocol(new URL("https://example.org"), "foo", "https:");
 testSetProtocol(new URL("fish://example.org"), "https", "fish:");
 
 // Search
-myURL = new URL('https://example.org/abc?123');
-myURL.search = 'abc=xyz';
+myURL = new URL("https://example.org/abc?123");
+myURL.search = "abc=xyz";
 assert.sameValue(myURL.href, "https://example.org/abc?abc=xyz");
 
-myURL.search = 'a=1 2';
+myURL.search = "a=1 2";
 assert.sameValue(myURL.href, "https://example.org/abc?a=1%202");
 
 myURL.search = "á=ú";
@@ -176,16 +177,32 @@ assert.sameValue(myURL.search, "?a=%23b");
 assert.sameValue(myURL.hash, "#hash");
 
 // Username
-myURL = new URL('https://abc:xyz@example.com/');
-myURL.username = '123';
+myURL = new URL("https://abc:xyz@example.com/");
+myURL.username = "123";
 assert.sameValue(myURL.href, "https://123:xyz@example.com/");
 
 // Origin, read-only
-assert.throws(() => {myURL.origin = "abc"}, TypeError);
+assert.throws(() => {
+  myURL.origin = "abc";
+}, TypeError);
 
 // href
-myURL = new URL("https://example.org")
+myURL = new URL("https://example.org");
 myURL.href = "https://example.com";
 assert.sameValue(myURL.href, "https://example.com/");
 
-assert.throws(() => {myURL.href = "test"}, TypeError);
+assert.throws(() => {
+  myURL.href = "test";
+}, TypeError);
+
+// Search Params
+
+myURL = new URL("https://example.com/");
+myURL.searchParams.append("user", "abc");
+assert.sameValue(myURL.toString(), "https://example.com/?user=abc");
+myURL.searchParams.append("first", "one");
+assert.sameValue(myURL.toString(), "https://example.com/?first=one&user=abc");
+myURL.searchParams = new URLSearchParams("query=something");
+assert.sameValue(myURL.toString(), "https://example.com/?query=something");
+myURL.searchParams.delete("query");
+assert.sameValue(myURL.toString(), "https://example.com/");
