@@ -3,9 +3,17 @@ package url
 import (
 	"fmt"
 	"net/url"
+	"reflect"
 	"strings"
 
 	"github.com/dop251/goja"
+)
+
+var (
+	reflectTypeString = reflect.TypeOf("")
+	reflectTypeObject = reflect.TypeOf(map[string]interface{}{})
+	reflectTypeArray  = reflect.TypeOf([]interface{}{})
+	reflectTypeMap    = reflect.TypeOf([][2]interface{}{})
 )
 
 func newInvalidTypleError(r *goja.Runtime) *goja.Object {
@@ -54,14 +62,15 @@ func createURLSearchParamsConstructor(r *goja.Runtime) goja.Value {
 		if len(call.Arguments) > 0 {
 			p := call.Arguments[0]
 			e := p.Export()
-			if s, ok := e.(string); ok { // String
-				u = buildParamsFromString(s)
-			} else if o, ok := e.(map[string]interface{}); ok { // Object
-				u = buildParamsFromObject(o)
-			} else if a, ok := e.([]interface{}); ok { // Array
-				u = buildParamsFromArray(r, a)
-			} else if m, ok := e.([][2]interface{}); ok { // Map
-				u = buildParamsFromMap(r, m)
+			switch p.ExportType() {
+			case reflectTypeString:
+				u = buildParamsFromString(e.(string))
+			case reflectTypeObject:
+				u = buildParamsFromObject(e.(map[string]interface{}))
+			case reflectTypeArray:
+				u = buildParamsFromArray(r, e.([]interface{}))
+			case reflectTypeMap:
+				u = buildParamsFromMap(r, e.([][2]interface{}))
 			}
 		}
 
