@@ -164,7 +164,8 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		name := call.Arguments[0].String()
 		if len(call.Arguments) > 1 {
 			value := call.Arguments[1].String()
-			if q.Has(name) && q.Get(name) == value {
+			_, has := q[name]
+			if has && q.Get(name) == value {
 				q.Del(name)
 				u.RawQuery = q.Encode()
 			}
@@ -223,7 +224,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		e := p.Export()
 		if n, ok := e.(string); ok {
 			_, q := urlAndQuery(r, call.This)
-			if !q.Has(n) {
+			if _, ok := q[n]; !ok {
 				return goja.Null()
 			}
 
@@ -242,7 +243,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		e := p.Export()
 		if n, ok := e.(string); ok {
 			_, q := urlAndQuery(r, call.This)
-			if !q.Has(n) {
+			if _, ok := q[n]; !ok {
 				return goja.Null()
 			}
 
@@ -262,7 +263,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		if n, ok := e.(string); ok {
 			_, q := urlAndQuery(r, call.This)
 
-			if !q.Has(n) {
+			if _, ok := q[n]; !ok {
 				return r.ToValue(false)
 			}
 
