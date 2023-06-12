@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -28,34 +29,15 @@ func newInvalidArgsError(r *goja.Runtime) *goja.Object {
 	return newError(r, "ERR_INVALID_ARG_TYPE", `The "callback" argument must be of type function. Received undefined`)
 }
 
-func newUnsupportedArgsError(r *goja.Runtime) *goja.Object {
-	return newError(r, "ERR_NOT_SUPPORTED", `The current method call is not supported.`)
-}
-
 func newError(r *goja.Runtime, code string, msg string) *goja.Object {
 	o := r.NewTypeError("[" + code + "]: " + msg)
 	o.Set("code", r.ToValue(code))
 	return o
 }
 
-func urlAndQuery(r *goja.Runtime, v goja.Value) (*url.URL, url.Values) {
-	u := toURL(r, v)
-	return u, u.Query()
-}
-
-// NOTE:
-//
-// Order of the parameters will not be maintained based on value passed in.
-// This is due to the encoding method on url.Values being backed by a map and not an array.
-//
 // Currently not supporting the following:
 //
 //   - ctor(iterable): Using function generators
-//
-//   - sort():  Since the backing object is a url.URL which backs the data as a Map, we can't reliably sort
-//     the entries
-//
-//   - [] operator: TODO, need to figure out if we can override this with goja
 func createURLSearchParamsConstructor(r *goja.Runtime) goja.Value {
 	f := r.ToValue(func(call goja.ConstructorCall) *goja.Object {
 		u, _ := url.Parse("")
@@ -74,7 +56,7 @@ func createURLSearchParamsConstructor(r *goja.Runtime) goja.Value {
 			}
 		}
 
-		res := r.ToValue(u).(*goja.Object)
+		res := r.ToValue(newFromURL(u)).(*goja.Object)
 		res.SetPrototype(call.This.Prototype())
 		return res
 	}).(*goja.Object)
@@ -102,29 +84,32 @@ func buildParamsFromString(s string) *url.URL {
 }
 
 func buildParamsFromObject(o map[string]interface{}) *url.URL {
-	query := url.Values{}
+	query := searchParams{}
 	for k, v := range o {
 		if val, ok := v.([]interface{}); ok {
 			vals := []string{}
 			for _, e := range val {
 				vals = append(vals, fmt.Sprintf("%v", e))
 			}
-			query.Add(k, strings.Join(vals, ","))
+			query = append(query, searchParam{name: k, value: vals})
 		} else {
-			query.Add(k, fmt.Sprintf("%v", v))
+			query = append(query, searchParam{name: k, value: []string{fmt.Sprintf("%v", v)}})
 		}
 	}
 	u, _ := url.Parse("")
-	u.RawQuery = query.Encode()
+	u.RawQuery = encodeSearchParams(query)
 	return u
 }
 
 func buildParamsFromArray(r *goja.Runtime, a []interface{}) *url.URL {
-	query := url.Values{}
+	query := searchParams{}
 	for _, v := range a {
 		if kv, ok := v.([]interface{}); ok {
 			if len(kv) == 2 {
-				query.Add(fmt.Sprintf("%v", kv[0]), fmt.Sprintf("%v", kv[1]))
+				query = append(query, searchParam{
+					name:  fmt.Sprintf("%v", kv[0]),
+					value: []string{fmt.Sprintf("%v", kv[1])},
+				})
 			} else {
 				panic(newInvalidTypleError(r))
 			}
@@ -134,18 +119,21 @@ func buildParamsFromArray(r *goja.Runtime, a []interface{}) *url.URL {
 	}
 
 	u, _ := url.Parse("")
-	u.RawQuery = query.Encode()
+	u.RawQuery = encodeSearchParams(query)
 	return u
 }
 
 func buildParamsFromMap(r *goja.Runtime, m [][2]interface{}) *url.URL {
-	query := url.Values{}
+	query := searchParams{}
 	for _, e := range m {
-		query.Add(fmt.Sprintf("%v", e[0]), fmt.Sprintf("%v", e[1]))
+		query = append(query, searchParam{
+			name:  fmt.Sprintf("%v", e[0]),
+			value: []string{fmt.Sprintf("%v", e[1])},
+		})
 	}
 
 	u, _ := url.Parse("")
-	u.RawQuery = query.Encode()
+	u.RawQuery = encodeSearchParams(query)
 	return u
 }
 
@@ -157,9 +145,12 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 			panic(newMissingArgsError(r, `The "name" and "value" arguments must be specified`))
 		}
 
-		u, q := urlAndQuery(r, call.This)
-		q.Add(call.Arguments[0].String(), call.Arguments[1].String())
-		u.RawQuery = q.Encode()
+		u := toURL(r, call.This)
+		u.searchParams = append(u.searchParams, searchParam{
+			name:  call.Arguments[0].String(),
+			value: []string{call.Arguments[1].String()},
+		})
+		u.search = encodeSearchParams(u.searchParams)
 
 		return goja.Undefined()
 	}))
@@ -169,19 +160,37 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 			panic(newMissingArgsError(r, `The "name" argument must be specified`))
 		}
 
-		u, q := urlAndQuery(r, call.This)
+		u := toURL(r, call.This)
 		name := call.Arguments[0].String()
 		if len(call.Arguments) > 1 {
 			value := call.Arguments[1].String()
-			_, has := q[name]
-			if has && q.Get(name) == value {
-				q.Del(name)
-				u.RawQuery = q.Encode()
+			arr := searchParams{}
+			for _, v := range u.searchParams {
+				if v.name != name {
+					arr = append(arr, v)
+				} else {
+					subArr := []string{}
+					for _, val := range v.value {
+						if val != value {
+							subArr = append(subArr, val)
+						}
+					}
+					if len(subArr) > 0 {
+						arr = append(arr, searchParam{name: name, value: subArr})
+					}
+				}
 			}
+			u.searchParams = arr
 		} else {
-			q.Del(name)
-			u.RawQuery = q.Encode()
+			arr := searchParams{}
+			for _, v := range u.searchParams {
+				if v.name != name {
+					arr = append(arr, v)
+				}
+			}
+			u.searchParams = arr
 		}
+		u.search = encodeSearchParams(u.searchParams)
 
 		return goja.Undefined()
 	}))
@@ -189,10 +198,8 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 	p.Set("entries", r.ToValue(func(call goja.FunctionCall) goja.Value {
 		u := toURL(r, call.This)
 		entries := [][]string{}
-		for k, e := range u.Query() {
-			for _, v := range e {
-				entries = append(entries, []string{k, v})
-			}
+		for _, sp := range u.searchParams {
+			entries = append(entries, []string{sp.name, strings.Join(sp.value, ",")})
 		}
 
 		return r.ToValue(entries)
@@ -203,16 +210,18 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 			panic(newInvalidArgsError(r))
 		}
 
-		u, q := urlAndQuery(r, call.This)
+		u := toURL(r, call.This)
 		if fn, ok := goja.AssertFunction(call.Arguments[0]); ok {
-			for k, e := range q {
+			for _, pair := range u.searchParams {
 				// name, value, searchParams
-				for _, v := range e {
+				for _, v := range pair.value {
+					query := strings.TrimPrefix(u.search, "?")
 					_, err := fn(
 						nil,
-						r.ToValue(k),
+						r.ToValue(pair.name),
 						r.ToValue(v),
-						r.ToValue(u.RawQuery))
+						r.ToValue(query),
+					)
 
 					if err != nil {
 						panic(err)
@@ -232,12 +241,11 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		p := call.Arguments[0]
 		e := p.Export()
 		if n, ok := e.(string); ok {
-			_, q := urlAndQuery(r, call.This)
-			if _, ok := q[n]; !ok {
-				return goja.Null()
+			u := toURL(r, call.This)
+			vals, _ := u.getValues(n)
+			if len(vals) > 0 {
+				return r.ToValue(vals[0])
 			}
-
-			return r.ToValue(q.Get(n))
 		}
 
 		return goja.Null()
@@ -251,12 +259,11 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		p := call.Arguments[0]
 		e := p.Export()
 		if n, ok := e.(string); ok {
-			_, q := urlAndQuery(r, call.This)
-			if _, ok := q[n]; !ok {
-				return goja.Null()
+			u := toURL(r, call.This)
+			vals, _ := u.getValues(n)
+			if len(vals) > 0 {
+				return r.ToValue(vals)
 			}
-
-			return r.ToValue(q[n])
 		}
 
 		return goja.Null()
@@ -270,20 +277,19 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		p := call.Arguments[0]
 		e := p.Export()
 		if n, ok := e.(string); ok {
-			_, q := urlAndQuery(r, call.This)
-
-			if _, ok := q[n]; !ok {
+			u := toURL(r, call.This)
+			vals, contained := u.getValues(n)
+			if len(call.Arguments) > 1 {
+				for _, v := range vals {
+					cmp := call.Arguments[1].String()
+					if v == cmp {
+						return r.ToValue(true)
+					}
+				}
 				return r.ToValue(false)
 			}
 
-			if len(call.Arguments) > 1 {
-				value := call.Arguments[1].String()
-				if value == q.Get(n) {
-					return r.ToValue(true)
-				}
-			} else {
-				return r.ToValue(true)
-			}
+			return r.ToValue(contained)
 		}
 
 		return r.ToValue(false)
@@ -292,8 +298,8 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 	p.Set("keys", r.ToValue(func(call goja.FunctionCall) goja.Value {
 		u := toURL(r, call.This)
 		keys := []string{}
-		for k := range u.Query() {
-			keys = append(keys, fmt.Sprintf("%v", k))
+		for _, sp := range u.searchParams {
+			keys = append(keys, sp.name)
 		}
 
 		return r.ToValue(keys)
@@ -304,38 +310,56 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 			panic(newMissingArgsError(r, `The "name" and "value" arguments must be specified`))
 		}
 
-		u, q := urlAndQuery(r, call.This)
-		q.Set(call.Arguments[0].String(), call.Arguments[1].String())
-		u.RawQuery = q.Encode()
+		u := toURL(r, call.This)
+		name := call.Arguments[0].String()
+		found := false
+		sps := searchParams{}
+		for _, sp := range u.searchParams {
+			if sp.name == name {
+				if found {
+					continue // Skip duplicates if present.
+				}
+
+				sp.value = []string{call.Arguments[1].String()}
+				found = true
+			}
+			sps = append(sps, sp)
+		}
+
+		if found {
+			u.searchParams = sps
+		} else {
+			u.searchParams = append(u.searchParams, searchParam{
+				name:  name,
+				value: []string{call.Arguments[1].String()},
+			})
+		}
+
+		u.search = encodeSearchParams(u.searchParams)
 
 		return goja.Undefined()
 	}))
 
 	p.Set("sort", r.ToValue(func(call goja.FunctionCall) goja.Value {
-		panic(newUnsupportedArgsError(r))
+		sort.Sort(toURL(r, call.This).searchParams)
+		return goja.Undefined()
 	}))
 
-	defineURLAccessorProp(r, p, "size", func(u *url.URL) interface{} {
-		q := u.Query()
-		t := 0
-		for _, v := range q {
-			t += len(v)
-		}
-		return t
+	defineURLAccessorProp(r, p, "size", func(u *nodeURL) interface{} {
+		return len(u.searchParams)
 	}, nil)
 
-	// toString()
 	p.Set("toString", r.ToValue(func(call goja.FunctionCall) goja.Value {
-		return r.ToValue(toURL(r, call.This).RawQuery)
+		u := toURL(r, call.This)
+		str := strings.TrimPrefix(encodeSearchParams(u.searchParams), "?")
+		return r.ToValue(str)
 	}))
 
 	p.Set("values", r.ToValue(func(call goja.FunctionCall) goja.Value {
 		u := toURL(r, call.This)
 		values := []string{}
-		for _, e := range u.Query() {
-			for _, v := range e {
-				values = append(values, fmt.Sprintf("%v", v))
-			}
+		for _, sp := range u.searchParams {
+			values = append(values, sp.value...)
 		}
 
 		return r.ToValue(values)

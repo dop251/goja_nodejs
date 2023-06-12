@@ -1,24 +1,22 @@
 package url
 
 import (
-	"net/url"
-
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/require"
 )
 
 const ModuleName = "node:url"
 
-func toURL(r *goja.Runtime, v goja.Value) *url.URL {
+func toURL(r *goja.Runtime, v goja.Value) *nodeURL {
 	if v.ExportType() == reflectTypeURL {
-		if u := v.Export().(*url.URL); u != nil {
+		if u := v.Export().(*nodeURL); u != nil {
 			return u
 		}
 	}
 	panic(r.NewTypeError("Expected URL"))
 }
 
-func defineURLAccessorProp(r *goja.Runtime, p *goja.Object, name string, getter func(*url.URL) interface{}, setter func(*url.URL, goja.Value)) {
+func defineURLAccessorProp(r *goja.Runtime, p *goja.Object, name string, getter func(*nodeURL) interface{}, setter func(*nodeURL, goja.Value)) {
 	var getterVal, setterVal goja.Value
 	if getter != nil {
 		getterVal = r.ToValue(func(call goja.FunctionCall) goja.Value {

@@ -13,13 +13,13 @@ testCtor(
     user: "abc",
     query: ["first", "second"],
   },
-  "query=first%2Csecond&user=abc"
+  "user=abc&query=first,second"
 );
 
 const map = new Map();
 map.set("user", "abc");
 map.set("query", "xyz");
-testCtor(map, "query=xyz&user=abc");
+testCtor(map, "user=abc&query=xyz");
 
 testCtor(
   [
@@ -27,7 +27,7 @@ testCtor(
     ["query", "first"],
     ["query", "second"],
   ],
-  "query=first&query=second&user=abc"
+  "user=abc&query=first&query=second"
 );
 
 // Each key-value pair must have exactly two elements
@@ -51,7 +51,7 @@ params = new URLSearchParams("?user=abc");
 assert.throws(() => params.append(), TypeError);
 assert.throws(() => params.append(), TypeError);
 params.append("query", "first");
-assert.sameValue(params.toString(), "query=first&user=abc");
+assert.sameValue(params.toString(), "user=abc&query=first");
 
 params = new URLSearchParams("first=one&second=two&third=three");
 assert.throws(() => params.delete(), TypeError);
@@ -85,23 +85,25 @@ params = new URLSearchParams();
 params.append("foo", "bar");
 params.append("foo", "baz");
 params.append("abc", "def");
-assert.sameValue(params.toString(), "abc=def&foo=bar&foo=baz");
+assert.sameValue(params.toString(), "foo=bar&foo=baz&abc=def");
 params.set("foo", "def");
 params.set("xyz", "opq");
-assert.sameValue(params.toString(), "abc=def&foo=def&xyz=opq");
+assert.sameValue(params.toString(), "foo=def&abc=def&xyz=opq");
 
-params = new URLSearchParams("query=first&query=second&user=abc");
+params = new URLSearchParams("query=first&query=second&user=abc&double=first,second");
 const entries = params.entries();
-assert.sameValue(entries.length, 3);
+assert.sameValue(entries.length, 4);
 assert.sameValue(entries[0].toString(), ["query", "first"].toString());
 assert.sameValue(entries[1].toString(), ["query", "second"].toString());
 assert.sameValue(entries[2].toString(), ["user", "abc"].toString());
+assert.sameValue(entries[3].toString(), ["double", "first,second"].toString());
 
 params = new URLSearchParams("query=first&query=second&user=abc");
 const keys = params.keys();
-assert.sameValue(keys.length, 2);
+assert.sameValue(keys.length, 3);
 assert.sameValue(keys[0], "query");
-assert.sameValue(keys[1], "user");
+assert.sameValue(keys[1], "query");
+assert.sameValue(keys[2], "user");
 
 params = new URLSearchParams("query=first&query=second&user=abc");
 const values = params.values();
@@ -109,6 +111,10 @@ assert.sameValue(values.length, 3);
 assert.sameValue(values[0], "first");
 assert.sameValue(values[1], "second");
 assert.sameValue(values[2], "abc");
+
+params = new URLSearchParams("query[]=abc&type=search&query[]=123");
+params.sort();
+assert.sameValue(params.toString(), "query%5B%5D=abc&query%5B%5D=123&type=search");
 
 params = new URLSearchParams("query=first&query=second&user=abc");
 assert.sameValue(params.size, 3);
