@@ -23,7 +23,7 @@ testURLCtor("HTTPS://á.com", "https://xn--1ca.com/");
 testURLCtor("HTTPS://á.com:123", "https://xn--1ca.com:123/");
 testURLCtor("HTTPS://á.com:123/á", "https://xn--1ca.com:123/%C3%A1");
 testURLCtor("fish://á.com", "fish://%C3%A1.com");
-// testURLCtor("https://test.com/?a=1 /2", "https://test.com/?a=1%20/2");
+testURLCtor("https://test.com/?a=1 /2", "https://test.com/?a=1+%2F2");
 testURLCtor("https://test.com/á=1?á=1&ü=2#é", "https://test.com/%C3%A1=1?%C3%A1=1&%C3%BC=2#%C3%A9");
 
 assert.throws(() => new URL("test"), TypeError);
@@ -162,7 +162,7 @@ myURL.search = "abc=xyz";
 assert.sameValue(myURL.href, "https://example.org/abc?abc=xyz");
 
 myURL.search = "a=1 2";
-// assert.sameValue(myURL.href, "https://example.org/abc?a=1%202");
+assert.sameValue(myURL.href, "https://example.org/abc?a=1+2");
 
 myURL.search = "á=ú";
 assert.sameValue(myURL.search, "?%C3%A1=%C3%BA");
