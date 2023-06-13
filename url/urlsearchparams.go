@@ -150,7 +150,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 			name:  call.Arguments[0].String(),
 			value: []string{call.Arguments[1].String()},
 		})
-		u.search = encodeSearchParams(u.searchParams)
+		u.syncSearchParams()
 
 		return goja.Undefined()
 	}))
@@ -190,7 +190,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 			}
 			u.searchParams = arr
 		}
-		u.search = encodeSearchParams(u.searchParams)
+		u.syncSearchParams()
 
 		return goja.Undefined()
 	}))
@@ -215,7 +215,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 			for _, pair := range u.searchParams {
 				// name, value, searchParams
 				for _, v := range pair.value {
-					query := strings.TrimPrefix(u.search, "?")
+					query := strings.TrimPrefix(u.url.RawQuery, "?")
 					_, err := fn(
 						nil,
 						r.ToValue(pair.name),
@@ -334,8 +334,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 				value: []string{call.Arguments[1].String()},
 			})
 		}
-
-		u.search = encodeSearchParams(u.searchParams)
+		u.syncSearchParams()
 
 		return goja.Undefined()
 	}))

@@ -7,18 +7,8 @@ import (
 )
 
 type nodeURL struct {
-	href         string
-	origin       string
-	protocol     string
-	username     string
-	password     string
-	host         string
-	hostname     string
-	port         string
-	pathname     string
-	search       string
+	url          *url.URL
 	searchParams searchParams
-	hash         string
 }
 
 type searchParam struct {
@@ -53,42 +43,12 @@ func (sp *searchParam) Encode() string {
 	return str
 }
 
+func (nu *nodeURL) syncSearchParams() {
+	nu.url.RawQuery = strings.TrimPrefix(encodeSearchParams(nu.searchParams), "?")
+}
+
 func (nu *nodeURL) String() string {
-	if nu.host == "" && nu.hostname == "" {
-		return nu.href
-	}
-
-	str := ""
-	if nu.protocol != "" {
-		str = fmt.Sprintf("%s%s://", str, nu.protocol)
-	}
-
-	if nu.username != "" {
-		str = fmt.Sprintf("%s%s:%s@", str, nu.username, nu.password)
-	}
-
-	if nu.host != "" {
-		str = fmt.Sprintf("%s%s", str, url.PathEscape(nu.host))
-	}
-
-	if nu.pathname != "" {
-		u, err := url.Parse(nu.pathname)
-		if err == nil {
-			str = fmt.Sprintf("%s%s", str, u.EscapedPath())
-		}
-	}
-
-	if nu.search != "" {
-		str = fmt.Sprintf("%s%s", str, encodeSearchParams(nu.searchParams))
-	}
-
-	if nu.hash != "" {
-		str = fmt.Sprintf("%s#%s", str, url.PathEscape(nu.hash))
-	}
-
-	nu.href = str
-
-	return str
+	return nu.url.String()
 }
 
 // Second return value determines if name was found in the search
@@ -117,24 +77,9 @@ func encodeSearchParams(sp searchParams) string {
 }
 
 func newFromURL(u *url.URL) *nodeURL {
-	p, _ := u.User.Password()
 	sp, _ := parseSearchQuery(u.RawQuery)
-
-	nu := nodeURL{
-		href:         u.String(),
-		origin:       u.Scheme + "://" + u.Hostname(),
-		protocol:     u.Scheme,
-		username:     u.User.Username(),
-		password:     p,
-		host:         u.Host,
-		hostname:     strings.Split(u.Host, ":")[0],
-		port:         u.Port(),
-		pathname:     u.Path,
-		search:       encodeSearchParams(sp),
-		searchParams: sp,
-		hash:         u.Fragment,
-	}
-
+	nu := nodeURL{url: u, searchParams: sp}
+	nu.syncSearchParams()
 	return &nu
 }
 
