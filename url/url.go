@@ -293,6 +293,11 @@ func createURLPrototype(r *goja.Runtime) *goja.Object {
 
 	// search Params
 	defineURLAccessorProp(r, p, "searchParams", func(u *nodeURL) interface{} {
+		if u.url.RawQuery != "" && len(u.searchParams) == 0 {
+			sp, _ := parseSearchQuery(u.url.RawQuery)
+			u.searchParams = sp
+		}
+
 		o := r.ToValue(u).(*goja.Object)
 		o.SetPrototype(createURLSearchParamsPrototype(r))
 		return o
@@ -304,6 +309,14 @@ func createURLPrototype(r *goja.Runtime) *goja.Object {
 
 	p.Set("toString", r.ToValue(func(call goja.FunctionCall) goja.Value {
 		u := toURL(r, call.This)
+
+		// Search Parameters are lazy loaded
+		if u.url.RawQuery != "" && len(u.searchParams) == 0 {
+			sp, _ := parseSearchQuery(u.url.RawQuery)
+			u.searchParams = sp
+		}
+		copy := u.url
+		copy.RawQuery = u.searchParams.Encode()
 		return r.ToValue(u.url.String())
 	}))
 
@@ -324,7 +337,7 @@ func createURLConstructor(r *goja.Runtime) goja.Value {
 		} else {
 			u = parseURL(r, call.Argument(0).String(), true)
 		}
-		res := r.ToValue(newFromURL(u)).(*goja.Object)
+		res := r.ToValue(&nodeURL{url: u}).(*goja.Object)
 		res.SetPrototype(call.This.Prototype())
 		return res
 	}).(*goja.Object)

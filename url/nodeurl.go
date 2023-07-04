@@ -48,7 +48,7 @@ func (s searchParams) Less(i, j int) bool {
 
 func (s searchParams) Encode() string {
 	str := ""
-	sep := "?"
+	sep := ""
 	for _, v := range s {
 		str = fmt.Sprintf("%s%s%s", str, sep, v.Encode())
 		sep = "&"
@@ -58,7 +58,7 @@ func (s searchParams) Encode() string {
 
 func (s searchParams) String() string {
 	str := ""
-	sep := "?"
+	sep := ""
 	for _, v := range s {
 		str = fmt.Sprintf("%s%s%s", str, sep, v.String())
 		sep = "&"
@@ -74,7 +74,7 @@ type nodeURL struct {
 // This methods ensures that the url.URL has the proper RawQuery based on the searchParam
 // structs. If a change is made to the searchParams we need to keep them in sync.
 func (nu *nodeURL) syncSearchParams() {
-	nu.url.RawQuery = strings.TrimPrefix(nu.searchParams.Encode(), "?")
+	nu.url.RawQuery = nu.searchParams.Encode()
 }
 
 func (nu *nodeURL) String() string {
@@ -94,13 +94,6 @@ func (nu *nodeURL) getValues(name string) ([]string, bool) {
 	}
 
 	return vals, contained
-}
-
-func newFromURL(u *url.URL) *nodeURL {
-	sp, _ := parseSearchQuery(u.RawQuery)
-	nu := nodeURL{url: u, searchParams: sp}
-	nu.syncSearchParams()
-	return &nu
 }
 
 func parseSearchQuery(query string) (searchParams, error) {

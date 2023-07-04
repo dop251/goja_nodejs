@@ -56,7 +56,8 @@ func createURLSearchParamsConstructor(r *goja.Runtime) goja.Value {
 			}
 		}
 
-		res := r.ToValue(newFromURL(u)).(*goja.Object)
+		sp, _ := parseSearchQuery(u.RawQuery)
+		res := r.ToValue(&nodeURL{url: u, searchParams: sp}).(*goja.Object)
 		res.SetPrototype(call.This.Prototype())
 		return res
 	}).(*goja.Object)
@@ -270,7 +271,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 			for _, pair := range u.searchParams {
 				// name, value, searchParams
 				for _, v := range pair.value {
-					query := strings.TrimPrefix(u.url.RawQuery, "?")
+					query := u.url.RawQuery
 					_, err := fn(
 						nil,
 						r.ToValue(pair.name),
@@ -405,7 +406,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 
 	p.Set("toString", r.ToValue(func(call goja.FunctionCall) goja.Value {
 		u := toURL(r, call.This)
-		str := strings.TrimPrefix(u.searchParams.Encode(), "?")
+		str := u.searchParams.Encode()
 		return r.ToValue(str)
 	}))
 

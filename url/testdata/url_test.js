@@ -21,6 +21,7 @@ testURLCtorBase("#hash", "https://example.org/", "https://example.org/#hash");
 testURLCtor("HTTP://test.com", "http://test.com/");
 testURLCtor("HTTPS://á.com", "https://xn--1ca.com/");
 testURLCtor("HTTPS://á.com:123", "https://xn--1ca.com:123/");
+testURLCtor("https://test.com#asdfá", "https://test.com/#asdf%C3%A1");
 testURLCtor("HTTPS://á.com:123/á", "https://xn--1ca.com:123/%C3%A1");
 testURLCtor("fish://á.com", "fish://%C3%A1.com");
 testURLCtor("https://test.com/?a=1 /2", "https://test.com/?a=1+%2F2");
