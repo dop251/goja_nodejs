@@ -11,16 +11,16 @@ function testCtor(value, expected) {
 testCtor("user=abc&query=xyz", "user=abc&query=xyz");
 testCtor("?user=abc&query=xyz", "user=abc&query=xyz");
 
-// Due to an ordering issue with the constructor and object, we manually test values since the order
-// may not be maintained.
-params = new URLSearchParams({
-  user: "abc",
-  query: ["first", "second"],
-});
-const user = params.get("user");
-assert.sameValue(user, "abc");
-const query = params.getAll("query");
-assert.sameValue(query.toString(), ["first", "second"].toString());
+testCtor(
+  {
+    num: 1,
+    user: "abc",
+    query: ["first", "second"],
+    obj: { prop: "value" },
+    b: true,
+  },
+  "num=1&user=abc&query=first%2Csecond&obj=%5Bobject+Object%5D&b=true"
+);
 
 const map = new Map();
 map.set("user", "abc");

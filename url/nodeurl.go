@@ -6,14 +6,30 @@ import (
 	"strings"
 )
 
-type nodeURL struct {
-	url          *url.URL
-	searchParams searchParams
-}
-
 type searchParam struct {
 	name  string
 	value []string
+}
+
+func (sp *searchParam) Encode() string {
+	vals := []string{}
+	for _, v := range sp.value {
+		vals = append(vals, url.QueryEscape(v))
+	}
+
+	str := url.QueryEscape(sp.name)
+	if len(vals) > 0 {
+		str = fmt.Sprintf("%s=%s", str, strings.Join(vals, ","))
+	}
+	return str
+}
+
+func (s searchParam) String() string {
+	str := url.QueryEscape(s.name)
+	if len(s.value) > 0 {
+		str = fmt.Sprintf("%s=%s", str, strings.Join(s.value, ","))
+	}
+	return str
 }
 
 type searchParams []searchParam
@@ -30,21 +46,35 @@ func (s searchParams) Less(i, j int) bool {
 	return len(s[i].name) > len(s[j].name)
 }
 
-func (sp *searchParam) Encode() string {
-	vals := []string{}
-	for _, v := range sp.value {
-		vals = append(vals, url.QueryEscape(v))
-	}
-
-	str := url.QueryEscape(sp.name)
-	if len(vals) > 0 {
-		str = fmt.Sprintf("%s=%s", str, strings.Join(vals, ","))
+func (s searchParams) Encode() string {
+	str := ""
+	sep := "?"
+	for _, v := range s {
+		str = fmt.Sprintf("%s%s%s", str, sep, v.Encode())
+		sep = "&"
 	}
 	return str
 }
 
+func (s searchParams) String() string {
+	str := ""
+	sep := "?"
+	for _, v := range s {
+		str = fmt.Sprintf("%s%s%s", str, sep, v.String())
+		sep = "&"
+	}
+	return str
+}
+
+type nodeURL struct {
+	url          *url.URL
+	searchParams searchParams
+}
+
+// This methods ensures that the url.URL has the proper RawQuery based on the searchParam
+// structs. If a change is made to the searchParams we need to keep them in sync.
 func (nu *nodeURL) syncSearchParams() {
-	nu.url.RawQuery = strings.TrimPrefix(encodeSearchParams(nu.searchParams), "?")
+	nu.url.RawQuery = strings.TrimPrefix(nu.searchParams.Encode(), "?")
 }
 
 func (nu *nodeURL) String() string {
@@ -64,16 +94,6 @@ func (nu *nodeURL) getValues(name string) ([]string, bool) {
 	}
 
 	return vals, contained
-}
-
-func encodeSearchParams(sp searchParams) string {
-	str := ""
-	sep := "?"
-	for _, v := range sp {
-		str = fmt.Sprintf("%s%s%s", str, sep, v.Encode())
-		sep = "&"
-	}
-	return str
 }
 
 func newFromURL(u *url.URL) *nodeURL {
@@ -96,7 +116,7 @@ func parseSearchQuery(query string) (searchParams, error) {
 		name := pair[0]
 		sp := searchParam{name: name, value: []string{}}
 		if len(pair) > 1 {
-			sp.value = append(sp.value, strings.Split(pair[1], ",")...)
+			sp.value = append(sp.value, []string{pair[1]}...)
 		}
 		ret = append(ret, sp)
 	}
