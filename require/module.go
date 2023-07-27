@@ -24,13 +24,13 @@ type ModuleLoader func(*js.Runtime, *js.Object)
 type SourceLoader func(path string) ([]byte, error)
 
 var (
-	InvalidModuleError     = errors.New("Invalid module")
-	IllegalModuleNameError = errors.New("Illegal module name")
-
+	InvalidModuleError          = errors.New("Invalid module")
+	IllegalModuleNameError      = errors.New("Illegal module name")
+	NoSuchBuiltInModuleError    = errors.New("No such built-in module")
 	ModuleFileDoesNotExistError = errors.New("module file does not exist")
 )
 
-var native map[string]ModuleLoader
+var native, builtin map[string]ModuleLoader
 
 // Registry contains a cache of compiled modules which can be used by multiple Runtimes
 type Registry struct {
@@ -217,10 +217,30 @@ func Require(runtime *js.Runtime, name string) js.Value {
 	panic(runtime.NewTypeError("Please enable require for this runtime using new(require.Registry).Enable(runtime)"))
 }
 
+// RegisterNativeModule registers a module that isn't loaded through a SourceLoader, but rather through
+// a provided ModuleLoader. Typically, this will be a module implemented in Go (although theoretically
+// it can be anything, depending on the ModuleLoader implementation).
+// Such modules take precedence over modules loaded through a SourceLoader, i.e. if a module name resolves as
+// native, the native module is loaded, and the SourceLoader is not consulted.
+// The binding is global and affects all instances of Registry.
+// It should be called from a package init() function as it may not be used concurrently with require() calls.
+// For registry-specific bindings see Registry.RegisterNativeModule.
 func RegisterNativeModule(name string, loader ModuleLoader) {
 	if native == nil {
 		native = make(map[string]ModuleLoader)
 	}
 	name = filepathClean(name)
 	native[name] = loader
+}
+
+// RegisterCoreModule registers a nodejs core module. If the name does not start with "node:", the module
+// will also be loadable as "node:<name>". Hence, for "builtin" modules (such as buffer, console, etc.)
+// the name should not include the "node:" prefix, but for prefix-only core modules (such as "node:test")
+// it should include the prefix.
+func RegisterCoreModule(name string, loader ModuleLoader) {
+	if builtin == nil {
+		builtin = make(map[string]ModuleLoader)
+	}
+	name = filepathClean(name)
+	builtin[name] = loader
 }

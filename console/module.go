@@ -8,7 +8,7 @@ import (
 	"github.com/dop251/goja_nodejs/util"
 )
 
-const ModuleName = "node:console"
+const ModuleName = "console"
 
 type Console struct {
 	runtime *goja.Runtime
@@ -78,5 +78,5 @@ func Enable(runtime *goja.Runtime) {
 }
 
 func init() {
-	require.RegisterNativeModule(ModuleName, Require)
+	require.RegisterCoreModule(ModuleName, Require)
 }
