@@ -104,14 +104,13 @@ func parseSearchQuery(query string) searchParams {
 	query = strings.TrimPrefix(query, "?")
 
 	for _, v := range strings.Split(query, "&") {
-		pair := strings.Split(v, "=")
-		name := pair[0]
-		sp := searchParam{name: name, value: ""}
-		if len(pair) > 1 {
-			sp.value = pair[1]
+		pair := strings.SplitN(v, "=", 2)
+		l := len(pair)
+		if l == 1 {
+			ret = append(ret, searchParam{name: pair[0], value: ""})
+		} else if l == 2 {
+			ret = append(ret, searchParam{name: pair[0], value: pair[1]})
 		}
-
-		ret = append(ret, sp)
 	}
 
 	return ret
