@@ -28,15 +28,25 @@ func TestConsole(t *testing.T) {
 	if _, err := vm.RunString("console.warn('')"); err != nil {
 		t.Fatal("console.warn() error", err)
 	}
+
+	if _, err := vm.RunString("console.info('')"); err != nil {
+		t.Fatal("console.info() error", err)
+	}
+
+	if _, err := vm.RunString("console.debug('')"); err != nil {
+		t.Fatal("console.debug() error", err)
+	}
 }
 
 func TestConsoleWithPrinter(t *testing.T) {
-	vm := goja.New()
+	var stdoutStr, stderrStr string
 
-	var lastPrint string
-	printer := PrinterFunc(func(s string) {
-		lastPrint = s
-	})
+	printer := StdPrinter{
+		StdoutPrint: func(s string) { stdoutStr += s },
+		StderrPrint: func(s string) { stderrStr += s },
+	}
+
+	vm := goja.New()
 
 	registry := new(require.Registry)
 	registry.Enable(vm)
@@ -47,24 +57,22 @@ func TestConsoleWithPrinter(t *testing.T) {
 		t.Fatal("console not found")
 	}
 
-	if _, err := vm.RunString("console.log('log')"); err != nil {
-		t.Fatal("console.log() error", err)
-	}
-	if lastPrint != "log" {
-		t.Fatal("lastPrint not 'log'", lastPrint)
-	}
-
-	if _, err := vm.RunString("console.error('error')"); err != nil {
-		t.Fatal("console.error() error", err)
-	}
-	if lastPrint != "error" {
-		t.Fatal("lastPrint not 'error'", lastPrint)
+	_, err := vm.RunString(`
+		console.log('a')
+		console.error('b')
+		console.warn('c')
+		console.debug('d')
+		console.info('e')
+	`)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	if _, err := vm.RunString("console.warn('warn')"); err != nil {
-		t.Fatal("console.warn() error", err)
+	if want := "ade"; stdoutStr != want {
+		t.Fatalf("Unexpected stdout output: got %q, want %q", stdoutStr, want)
 	}
-	if lastPrint != "warn" {
-		t.Fatal("lastPrint not 'warn'", lastPrint)
+
+	if want := "bc"; stderrStr != want {
+		t.Fatalf("Unexpected stderr output: got %q, want %q", stderrStr, want)
 	}
 }
