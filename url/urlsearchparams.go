@@ -56,7 +56,7 @@ func createURLSearchParamsConstructor(r *goja.Runtime) goja.Value {
 			}
 		}
 
-		sp, _ := parseSearchQuery(u.RawQuery)
+		sp := parseSearchQuery(u.RawQuery)
 		res := r.ToValue(&nodeURL{url: u, searchParams: sp}).(*goja.Object)
 		res.SetPrototype(call.This.Prototype())
 		return res
@@ -298,7 +298,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		e := p.Export()
 		if n, ok := e.(string); ok {
 			u := toURL(r, call.This)
-			vals, _ := u.getValues(n)
+			vals := u.getValues(n)
 			if len(vals) > 0 {
 				return r.ToValue(vals[0])
 			}
@@ -316,7 +316,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		e := p.Export()
 		if n, ok := e.(string); ok {
 			u := toURL(r, call.This)
-			vals, _ := u.getValues(n)
+			vals := u.getValues(n)
 			if len(vals) > 0 {
 				return r.ToValue(vals)
 			}
@@ -334,10 +334,10 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		e := p.Export()
 		if n, ok := e.(string); ok {
 			u := toURL(r, call.This)
-			vals, contained := u.getValues(n)
+			vals := u.getValues(n)
 			if len(call.Arguments) > 1 {
+				cmp := call.Arguments[1].String()
 				for _, v := range vals {
-					cmp := call.Arguments[1].String()
 					if v == cmp {
 						return r.ToValue(true)
 					}
@@ -345,7 +345,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 				return r.ToValue(false)
 			}
 
-			return r.ToValue(contained)
+			return r.ToValue(u.hasName(n))
 		}
 
 		return r.ToValue(false)

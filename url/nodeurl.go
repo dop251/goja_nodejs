@@ -12,24 +12,19 @@ type searchParam struct {
 }
 
 func (sp *searchParam) Encode() string {
-	vals := []string{}
-	for _, v := range sp.value {
-		vals = append(vals, url.QueryEscape(v))
-	}
-
-	str := url.QueryEscape(sp.name)
-	if len(vals) > 0 {
-		str = fmt.Sprintf("%s=%s", str, strings.Join(vals, ","))
-	}
-	return str
+	return sp.string(true)
 }
 
-func (s searchParam) String() string {
-	str := url.QueryEscape(s.name)
-	if len(s.value) > 0 {
-		str = fmt.Sprintf("%s=%s", str, strings.Join(s.value, ","))
+func (sp *searchParam) string(encode bool) string {
+	vals := []string{}
+	for _, v := range sp.value {
+		if encode {
+			vals = append(vals, fmt.Sprintf("%s=%s", url.QueryEscape(sp.name), url.QueryEscape(v)))
+		} else {
+			vals = append(vals, fmt.Sprintf("%s=%s", sp.name, v))
+		}
 	}
-	return str
+	return strings.Join(vals, "&")
 }
 
 type searchParams []searchParam
@@ -57,13 +52,14 @@ func (s searchParams) Encode() string {
 }
 
 func (s searchParams) String() string {
-	str := ""
+	var b strings.Builder
 	sep := ""
 	for _, v := range s {
-		str = fmt.Sprintf("%s%s%s", str, sep, v.String())
+		b.WriteString(sep)
+		b.WriteString(v.string(false)) // keep it raw
 		sep = "&"
 	}
-	return str
+	return b.String()
 }
 
 type nodeURL struct {
@@ -81,25 +77,30 @@ func (nu *nodeURL) String() string {
 	return nu.url.String()
 }
 
-// Second return value determines if name was found in the search
-func (nu *nodeURL) getValues(name string) ([]string, bool) {
-	contained := false
+func (nu *nodeURL) hasName(name string) bool {
+	for _, v := range nu.searchParams {
+		if v.name == name {
+			return true
+		}
+	}
+	return false
+}
 
+func (nu *nodeURL) getValues(name string) []string {
 	vals := []string{}
 	for _, v := range nu.searchParams {
 		if v.name == name {
-			contained = true
 			vals = append(vals, v.value...)
 		}
 	}
 
-	return vals, contained
+	return vals
 }
 
-func parseSearchQuery(query string) (searchParams, error) {
+func parseSearchQuery(query string) searchParams {
 	ret := searchParams{}
 	if query == "" {
-		return ret, nil
+		return ret
 	}
 
 	query = strings.TrimPrefix(query, "?")
@@ -114,5 +115,5 @@ func parseSearchQuery(query string) (searchParams, error) {
 		ret = append(ret, sp)
 	}
 
-	return ret, nil
+	return ret
 }

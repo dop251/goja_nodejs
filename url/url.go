@@ -294,7 +294,7 @@ func createURLPrototype(r *goja.Runtime) *goja.Object {
 	// search Params
 	defineURLAccessorProp(r, p, "searchParams", func(u *nodeURL) interface{} {
 		if u.url.RawQuery != "" && len(u.searchParams) == 0 {
-			sp, _ := parseSearchQuery(u.url.RawQuery)
+			sp := parseSearchQuery(u.url.RawQuery)
 			u.searchParams = sp
 		}
 
@@ -312,7 +312,7 @@ func createURLPrototype(r *goja.Runtime) *goja.Object {
 
 		// Search Parameters are lazy loaded
 		if u.url.RawQuery != "" && len(u.searchParams) == 0 {
-			sp, _ := parseSearchQuery(u.url.RawQuery)
+			sp := parseSearchQuery(u.url.RawQuery)
 			u.searchParams = sp
 		}
 		copy := u.url
