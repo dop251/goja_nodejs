@@ -8,7 +8,7 @@ import (
 
 type searchParam struct {
 	name  string
-	value []string
+	value string
 }
 
 func (sp *searchParam) Encode() string {
@@ -17,12 +17,10 @@ func (sp *searchParam) Encode() string {
 
 func (sp *searchParam) string(encode bool) string {
 	vals := []string{}
-	for _, v := range sp.value {
-		if encode {
-			vals = append(vals, fmt.Sprintf("%s=%s", url.QueryEscape(sp.name), url.QueryEscape(v)))
-		} else {
-			vals = append(vals, fmt.Sprintf("%s=%s", sp.name, v))
-		}
+	if encode {
+		vals = append(vals, fmt.Sprintf("%s=%s", url.QueryEscape(sp.name), url.QueryEscape(sp.value)))
+	} else {
+		vals = append(vals, fmt.Sprintf("%s=%s", sp.name, sp.value))
 	}
 	return strings.Join(vals, "&")
 }
@@ -90,7 +88,7 @@ func (nu *nodeURL) getValues(name string) []string {
 	vals := []string{}
 	for _, v := range nu.searchParams {
 		if v.name == name {
-			vals = append(vals, v.value...)
+			vals = append(vals, v.value)
 		}
 	}
 
@@ -108,10 +106,11 @@ func parseSearchQuery(query string) searchParams {
 	for _, v := range strings.Split(query, "&") {
 		pair := strings.Split(v, "=")
 		name := pair[0]
-		sp := searchParam{name: name, value: []string{}}
+		sp := searchParam{name: name, value: ""}
 		if len(pair) > 1 {
-			sp.value = append(sp.value, []string{pair[1]}...)
+			sp.value = pair[1]
 		}
+
 		ret = append(ret, sp)
 	}
 

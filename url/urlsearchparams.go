@@ -90,7 +90,7 @@ func buildParamsFromObject(r *goja.Runtime, v goja.Value) *url.URL {
 	o := v.ToObject(r)
 	for _, k := range o.Keys() {
 		val := stringFromValue(r, o.Get(k))
-		query = append(query, searchParam{name: k, value: []string{val}})
+		query = append(query, searchParam{name: k, value: val})
 	}
 
 	u, _ := url.Parse("")
@@ -131,7 +131,7 @@ func buildParamsFromArray(r *goja.Runtime, v goja.Value) *url.URL {
 
 			query = append(query, searchParam{
 				name:  name,
-				value: []string{value},
+				value: value,
 			})
 
 			return true
@@ -155,7 +155,7 @@ func buildParamsFromMap(r *goja.Runtime, v goja.Value) *url.URL {
 			obj := val.ToObject(r)
 			query = append(query, searchParam{
 				name:  obj.Get("0").String(),
-				value: []string{stringFromValue(r, obj.Get("1"))},
+				value: stringFromValue(r, obj.Get("1")),
 			})
 			return true
 		})
@@ -204,7 +204,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		u := toURL(r, call.This)
 		u.searchParams = append(u.searchParams, searchParam{
 			name:  call.Arguments[0].String(),
-			value: []string{call.Arguments[1].String()},
+			value: call.Arguments[1].String(),
 		})
 		u.syncSearchParams()
 
@@ -218,34 +218,17 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 
 		u := toURL(r, call.This)
 		name := call.Arguments[0].String()
-		if len(call.Arguments) > 1 {
-			value := call.Arguments[1].String()
-			arr := searchParams{}
-			for _, v := range u.searchParams {
-				if v.name != name {
-					arr = append(arr, v)
-				} else {
-					subArr := []string{}
-					for _, val := range v.value {
-						if val != value {
-							subArr = append(subArr, val)
-						}
-					}
-					if len(subArr) > 0 {
-						arr = append(arr, searchParam{name: name, value: subArr})
-					}
-				}
+		arr := searchParams{}
+		l := len(call.Arguments)
+		for _, v := range u.searchParams {
+			if v.name != name {
+				arr = append(arr, v)
+			} else if l > 1 && v.value != call.Arguments[1].String() {
+				arr = append(arr, v)
 			}
-			u.searchParams = arr
-		} else {
-			arr := searchParams{}
-			for _, v := range u.searchParams {
-				if v.name != name {
-					arr = append(arr, v)
-				}
-			}
-			u.searchParams = arr
 		}
+
+		u.searchParams = arr
 		u.syncSearchParams()
 
 		return goja.Undefined()
@@ -255,7 +238,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		u := toURL(r, call.This)
 		entries := [][]string{}
 		for _, sp := range u.searchParams {
-			entries = append(entries, []string{sp.name, strings.Join(sp.value, ",")})
+			entries = append(entries, []string{sp.name, sp.value})
 		}
 
 		return r.ToValue(entries)
@@ -376,7 +359,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 					continue // Skip duplicates if present.
 				}
 
-				sp.value = []string{call.Arguments[1].String()}
+				sp.value = call.Arguments[1].String()
 				found = true
 			}
 			sps = append(sps, sp)
@@ -387,7 +370,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		} else {
 			u.searchParams = append(u.searchParams, searchParam{
 				name:  name,
-				value: []string{call.Arguments[1].String()},
+				value: call.Arguments[1].String(),
 			})
 		}
 		u.syncSearchParams()
@@ -414,7 +397,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		u := toURL(r, call.This)
 		values := []string{}
 		for _, sp := range u.searchParams {
-			values = append(values, sp.value...)
+			values = append(values, sp.value)
 		}
 
 		return r.ToValue(values)
