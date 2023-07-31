@@ -8,8 +8,8 @@ function testCtor(value, expected) {
   assert.sameValue(new URLSearchParams(value).toString(), expected);
 }
 
-// testCtor("user=abc&query=xyz", "user=abc&query=xyz");
-// testCtor("?user=abc&query=xyz", "user=abc&query=xyz");
+testCtor("user=abc&query=xyz", "user=abc&query=xyz");
+testCtor("?user=abc&query=xyz", "user=abc&query=xyz");
 
 testCtor(
   {
