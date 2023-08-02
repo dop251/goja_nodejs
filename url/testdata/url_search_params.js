@@ -77,9 +77,14 @@ const all = params.getAll("query");
 assert.sameValue(all.includes("first"), true);
 assert.sameValue(all.includes("second"), true);
 assert.sameValue(all.length, 2);
+const getAllUndefined = params.getAll(undefined);
+assert.sameValue(getAllUndefined.length, 0);
+const getAllNonExistant = params.getAll("does_not_exists");
+assert.sameValue(getAllNonExistant.length, 0);
 
 params = new URLSearchParams("user=abc&query=xyz");
 assert.throws(() => params.has(), TypeError);
+assert.sameValue(params.has(undefined), false);
 assert.sameValue(params.has("user"), true);
 assert.sameValue(params.has("user", "abc"), true);
 assert.sameValue(params.has("user", "abc", "extra-param"), true);
