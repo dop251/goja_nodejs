@@ -332,7 +332,7 @@ func createURLConstructor(r *goja.Runtime) goja.Value {
 		var u *url.URL
 		if baseArg := call.Argument(1); !goja.IsUndefined(baseArg) {
 			base := parseURL(r, baseArg.String(), true)
-			ref := parseURL(r, call.Arguments[0].String(), false)
+			ref := parseURL(r, call.Argument(0).String(), false)
 			u = base.ResolveReference(ref)
 		} else {
 			u = parseURL(r, call.Argument(0).String(), true)

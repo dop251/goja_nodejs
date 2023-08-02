@@ -40,8 +40,8 @@ func newError(r *goja.Runtime, code string, msg string) *goja.Object {
 func createURLSearchParamsConstructor(r *goja.Runtime) goja.Value {
 	f := r.ToValue(func(call goja.ConstructorCall) *goja.Object {
 		u, _ := url.Parse("")
-		if len(call.Arguments) > 0 {
-			v := call.Arguments[0]
+		v := call.Argument(0)
+		if !goja.IsUndefined(v) {
 			switch v.ExportType() {
 			case reflectTypeString:
 				var str string
@@ -203,8 +203,8 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 
 		u := toURL(r, call.This)
 		u.searchParams = append(u.searchParams, searchParam{
-			name:  call.Arguments[0].String(),
-			value: call.Arguments[1].String(),
+			name:  call.Argument(0).String(),
+			value: call.Argument(1).String(),
 		})
 		u.syncSearchParams()
 
@@ -217,14 +217,16 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		}
 
 		u := toURL(r, call.This)
-		name := call.Arguments[0].String()
+		name := call.Argument(0).String()
 		arr := searchParams{}
-		l := len(call.Arguments)
 		for _, v := range u.searchParams {
 			if v.name != name {
 				arr = append(arr, v)
-			} else if l > 1 && v.value != call.Arguments[1].String() {
-				arr = append(arr, v)
+			} else {
+				arg := call.Argument(1)
+				if !goja.IsUndefined(arg) && v.value != arg.String() {
+					arr = append(arr, v)
+				}
 			}
 		}
 
@@ -250,7 +252,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		}
 
 		u := toURL(r, call.This)
-		if fn, ok := goja.AssertFunction(call.Arguments[0]); ok {
+		if fn, ok := goja.AssertFunction(call.Argument(0)); ok {
 			for _, pair := range u.searchParams {
 				// name, value, searchParams
 				for _, v := range pair.value {
@@ -277,7 +279,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 			panic(newMissingArgsError(r, `The "name" argument must be specified`))
 		}
 
-		p := call.Arguments[0]
+		p := call.Argument(0)
 		e := p.Export()
 		if n, ok := e.(string); ok {
 			u := toURL(r, call.This)
@@ -295,7 +297,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 			panic(newMissingArgsError(r, `The "name" argument must be specified`))
 		}
 
-		p := call.Arguments[0]
+		p := call.Argument(0)
 		e := p.Export()
 		if n, ok := e.(string); ok {
 			u := toURL(r, call.This)
@@ -305,7 +307,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 			}
 		}
 
-		return goja.Null()
+		return r.ToValue([]string{})
 	}))
 
 	p.Set("has", r.ToValue(func(call goja.FunctionCall) goja.Value {
@@ -313,13 +315,14 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 			panic(newMissingArgsError(r, `The "name" argument must be specified`))
 		}
 
-		p := call.Arguments[0]
+		p := call.Argument(0)
 		e := p.Export()
 		if n, ok := e.(string); ok {
 			u := toURL(r, call.This)
 			vals := u.getValues(n)
-			if len(call.Arguments) > 1 {
-				cmp := call.Arguments[1].String()
+			param := call.Argument(1)
+			if !goja.IsUndefined(param) {
+				cmp := param.String()
 				for _, v := range vals {
 					if v == cmp {
 						return r.ToValue(true)
@@ -350,7 +353,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		}
 
 		u := toURL(r, call.This)
-		name := call.Arguments[0].String()
+		name := call.Argument(0).String()
 		found := false
 		sps := searchParams{}
 		for _, sp := range u.searchParams {
@@ -359,7 +362,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 					continue // Skip duplicates if present.
 				}
 
-				sp.value = call.Arguments[1].String()
+				sp.value = call.Argument(1).String()
 				found = true
 			}
 			sps = append(sps, sp)
@@ -370,7 +373,7 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 		} else {
 			u.searchParams = append(u.searchParams, searchParam{
 				name:  name,
-				value: call.Arguments[1].String(),
+				value: call.Argument(1).String(),
 			})
 		}
 		u.syncSearchParams()
