@@ -9,6 +9,8 @@ import (
 	js "github.com/dop251/goja"
 )
 
+const NodePrefix = "node:"
+
 // NodeJS module search algorithm described by
 // https://nodejs.org/api/modules.html#modules_all_together
 func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
@@ -41,7 +43,11 @@ func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
 		if err == nil {
 			return
 		} else {
-			err = nil
+			if err == InvalidModuleError {
+				err = nil
+			} else {
+				return
+			}
 		}
 		if module = r.nodeModules[p]; module != nil {
 			return
@@ -69,9 +75,31 @@ func (r *RequireModule) loadNative(path string) (*js.Object, error) {
 		ldr = native[path]
 	}
 
+	var isBuiltIn, withPrefix bool
+	if ldr == nil {
+		ldr = builtin[path]
+		if ldr == nil && strings.HasPrefix(path, NodePrefix) {
+			ldr = builtin[path[len(NodePrefix):]]
+			if ldr == nil {
+				return nil, NoSuchBuiltInModuleError
+			}
+			withPrefix = true
+		}
+		isBuiltIn = true
+	}
+
 	if ldr != nil {
 		module = r.createModuleObject()
 		r.modules[path] = module
+		if isBuiltIn {
+			if withPrefix {
+				r.modules[path[len(NodePrefix):]] = module
+			} else {
+				if !strings.HasPrefix(path, NodePrefix) {
+					r.modules[NodePrefix+path] = module
+				}
+			}
+		}
 		ldr(r.runtime, module)
 		return module, nil
 	}

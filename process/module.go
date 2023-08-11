@@ -10,7 +10,7 @@ import (
 	"github.com/dop251/goja_nodejs/require"
 )
 
-const ModuleName = "node:process"
+const ModuleName = "process"
 
 type Process struct {
 	env map[string]string
@@ -57,5 +57,5 @@ func Enable(runtime *goja.Runtime) {
 }
 
 func init() {
-	require.RegisterNativeModule(ModuleName, Require)
+	require.RegisterCoreModule(ModuleName, Require)
 }

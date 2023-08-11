@@ -14,7 +14,7 @@ import (
 	"golang.org/x/text/encoding/unicode"
 )
 
-const ModuleName = "node:buffer"
+const ModuleName = "buffer"
 
 type Buffer struct {
 	r *goja.Runtime
@@ -442,5 +442,5 @@ func Require(runtime *goja.Runtime, module *goja.Object) {
 }
 
 func init() {
-	require.RegisterNativeModule(ModuleName, Require)
+	require.RegisterCoreModule(ModuleName, Require)
 }

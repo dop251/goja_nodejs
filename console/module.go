@@ -1,14 +1,12 @@
 package console
 
 import (
-	"log"
-
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/require"
 	"github.com/dop251/goja_nodejs/util"
 )
 
-const ModuleName = "node:console"
+const ModuleName = "console"
 
 type Console struct {
 	runtime *goja.Runtime
@@ -21,16 +19,6 @@ type Printer interface {
 	Warn(string)
 	Error(string)
 }
-
-type PrinterFunc func(s string)
-
-func (p PrinterFunc) Log(s string) { p(s) }
-
-func (p PrinterFunc) Warn(s string) { p(s) }
-
-func (p PrinterFunc) Error(s string) { p(s) }
-
-var defaultPrinter Printer = PrinterFunc(func(s string) { log.Print(s) })
 
 func (c *Console) log(p func(string)) func(goja.FunctionCall) goja.Value {
 	return func(call goja.FunctionCall) goja.Value {
@@ -50,7 +38,7 @@ func (c *Console) log(p func(string)) func(goja.FunctionCall) goja.Value {
 }
 
 func Require(runtime *goja.Runtime, module *goja.Object) {
-	requireWithPrinter(defaultPrinter)(runtime, module)
+	requireWithPrinter(defaultStdPrinter)(runtime, module)
 }
 
 func RequireWithPrinter(printer Printer) require.ModuleLoader {
@@ -70,6 +58,8 @@ func requireWithPrinter(printer Printer) require.ModuleLoader {
 		o.Set("log", c.log(c.printer.Log))
 		o.Set("error", c.log(c.printer.Error))
 		o.Set("warn", c.log(c.printer.Warn))
+		o.Set("info", c.log(c.printer.Log))
+		o.Set("debug", c.log(c.printer.Log))
 	}
 }
 
@@ -78,5 +68,5 @@ func Enable(runtime *goja.Runtime) {
 }
 
 func init() {
-	require.RegisterNativeModule(ModuleName, Require)
+	require.RegisterCoreModule(ModuleName, Require)
 }
