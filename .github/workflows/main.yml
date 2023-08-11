@@ -11,7 +11,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
@@ -19,7 +19,11 @@ jobs:
       - name: Check formatting
         run: diff -u <(echo -n) <(gofmt -d .)
         if: runner.os != 'Windows'
+      - name: Run go vet
+        env:
+          GOARCH: ${{ matrix.arch }}
+        run: go vet ./...
       - name: Run tests
         env:
           GOARCH: ${{ matrix.arch }}
-        run: go test ./...
+        run: go test -vet=off ./...

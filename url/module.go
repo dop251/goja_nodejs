@@ -13,7 +13,7 @@ import (
 	"github.com/dop251/goja_nodejs/require"
 )
 
-const ModuleName = "node:url"
+const ModuleName = "url"
 
 var (
 	reflectTypeURL = reflect.TypeOf((*url.URL)(nil))
@@ -360,5 +360,5 @@ func Enable(runtime *goja.Runtime) {
 }
 
 func init() {
-	require.RegisterNativeModule(ModuleName, Require)
+	require.RegisterCoreModule(ModuleName, Require)
 }

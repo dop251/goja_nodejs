@@ -50,6 +50,84 @@ func TestRequireNativeModule(t *testing.T) {
 	}
 }
 
+func TestRegisterCoreModule(t *testing.T) {
+	vm := js.New()
+
+	registry := new(Registry)
+	registry.Enable(vm)
+
+	RegisterCoreModule("coremod", func(runtime *js.Runtime, module *js.Object) {
+		o := module.Get("exports").(*js.Object)
+		o.Set("test", func(call js.FunctionCall) js.Value {
+			return runtime.ToValue("passed")
+		})
+	})
+
+	RegisterCoreModule("coremod1", func(runtime *js.Runtime, module *js.Object) {
+		o := module.Get("exports").(*js.Object)
+		o.Set("test", func(call js.FunctionCall) js.Value {
+			return runtime.ToValue("passed1")
+		})
+	})
+
+	RegisterCoreModule("node:test1", func(runtime *js.Runtime, module *js.Object) {
+		o := module.Get("exports").(*js.Object)
+		o.Set("test", func(call js.FunctionCall) js.Value {
+			return runtime.ToValue("test1 passed")
+		})
+	})
+
+	registry.RegisterNativeModule("bob", func(runtime *js.Runtime, module *js.Object) {
+
+	})
+
+	_, err := vm.RunString(`
+	const m1 = require("coremod");
+	const m2 = require("node:coremod");
+	if (m1 !== m2) {
+		throw new Error("Modules are not equal");
+	}
+	if (m1.test() !== "passed") {
+		throw new Error("m1.test() has failed");
+	}
+
+	const m3 = require("node:coremod1");
+	const m4 = require("coremod1");
+	if (m3 !== m4) {
+		throw new Error("Modules are not equal (1)");
+	}
+	if (m3.test() !== "passed1") {
+		throw new Error("m3.test() has failed");
+	}
+
+	try {
+		require("node:bob");
+	} catch (e) {
+		if (!e.message.includes("No such built-in module")) {
+			throw e;
+		}
+	}
+	require("bob");
+
+	try {
+		require("test1");
+		throw new Error("Expected exception");
+	} catch (e) {
+		if (!e.message.includes("Invalid module")) {
+			throw e;
+		}
+	}
+
+	if (require("node:test1").test() !== "test1 passed") {
+		throw new Error("test1.test() has failed");
+	}
+	`)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRequireRegistryNativeModule(t *testing.T) {
 	const SCRIPT = `
 	var log = require("test/log");
