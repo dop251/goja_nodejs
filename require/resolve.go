@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path"
+	"path/filepath"
 	"strings"
 
 	js "github.com/dop251/goja"
@@ -28,9 +29,12 @@ func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
 	}
 
 	p := path.Join(start, modpath)
-	if strings.HasPrefix(origPath, "./") ||
-		strings.HasPrefix(origPath, "/") || strings.HasPrefix(origPath, "../") ||
-		origPath == "." || origPath == ".." {
+	if origPath == "." || origPath == ".." ||
+		strings.HasPrefix(origPath, "/") ||
+		strings.HasPrefix(origPath, "./") ||
+		strings.HasPrefix(origPath, "../") ||
+		// as last resort check if it is OS specific absolute path (eg. `C:\...`)
+		filepath.IsAbs(origPath) {
 		if module = r.modules[p]; module != nil {
 			return
 		}

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	js "github.com/dop251/goja"
@@ -191,6 +192,34 @@ func TestRequire(t *testing.T) {
 
 	registry := new(Registry)
 	registry.Enable(vm)
+
+	v, err := vm.RunString(SCRIPT)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !v.StrictEquals(vm.ToValue("passed")) {
+		t.Fatalf("Unexpected result: %v", v)
+	}
+}
+
+func TestRequireAbsPath(t *testing.T) {
+	const SCRIPT = `
+	var m = require(absPath);
+	m.test();
+	`
+
+	absPath, err := filepath.Abs("./testdata/m.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vm := js.New()
+
+	registry := new(Registry)
+	registry.Enable(vm)
+
+	vm.Set("absPath", absPath)
 
 	v, err := vm.RunString(SCRIPT)
 	if err != nil {
