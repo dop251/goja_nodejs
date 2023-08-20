@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	js "github.com/dop251/goja"
@@ -183,51 +184,68 @@ func TestRequireRegistryNativeModule(t *testing.T) {
 }
 
 func TestRequire(t *testing.T) {
-	const SCRIPT = `
-	var m = require("./testdata/m.js");
-	m.test();
-	`
-
-	vm := js.New()
-
-	registry := new(Registry)
-	registry.Enable(vm)
-
-	v, err := vm.RunString(SCRIPT)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !v.StrictEquals(vm.ToValue("passed")) {
-		t.Fatalf("Unexpected result: %v", v)
-	}
-}
-
-func TestRequireAbsPath(t *testing.T) {
-	const SCRIPT = `
-	var m = require(absPath);
-	m.test();
-	`
-
 	absPath, err := filepath.Abs("./testdata/m.js")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	vm := js.New()
+	isWindows := runtime.GOOS == "windows"
 
-	registry := new(Registry)
-	registry.Enable(vm)
-
-	vm.Set("absPath", absPath)
-
-	v, err := vm.RunString(SCRIPT)
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		path string
+		ok   bool
+	}{
+		{
+			"./testdata/m.js",
+			true,
+		},
+		{
+			"../require/testdata/m.js",
+			true,
+		},
+		{
+			absPath,
+			true,
+		},
+		{
+			`.\testdata\m.js`,
+			isWindows,
+		},
+		{
+			`..\require\testdata\m.js`,
+			isWindows,
+		},
 	}
 
-	if !v.StrictEquals(vm.ToValue("passed")) {
-		t.Fatalf("Unexpected result: %v", v)
+	const SCRIPT = `
+	var m = require(testPath);
+	m.test();
+	`
+
+	for _, test := range tests {
+		t.Run(test.path, func(t *testing.T) {
+			vm := js.New()
+			vm.Set("testPath", test.path)
+
+			registry := new(Registry)
+			registry.Enable(vm)
+
+			v, err := vm.RunString(SCRIPT)
+
+			ok := err == nil
+
+			if ok != test.ok {
+				t.Fatalf("Expected ok to be %v, got %v (%v)", test.ok, ok, err)
+			}
+
+			if !ok {
+				return
+			}
+
+			if !v.StrictEquals(vm.ToValue("passed")) {
+				t.Fatalf("Unexpected result: %v", v)
+			}
+		})
 	}
 }
 

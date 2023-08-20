@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	js "github.com/dop251/goja"
@@ -29,12 +30,7 @@ func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
 	}
 
 	p := path.Join(start, modpath)
-	if origPath == "." || origPath == ".." ||
-		strings.HasPrefix(origPath, "/") ||
-		strings.HasPrefix(origPath, "./") ||
-		strings.HasPrefix(origPath, "../") ||
-		// as last resort check if it is OS specific absolute path (eg. `C:\...`)
-		filepath.IsAbs(origPath) {
+	if isFileOrDirectoryPath(origPath) {
 		if module = r.modules[p]; module != nil {
 			return
 		}
@@ -261,4 +257,20 @@ func (r *RequireModule) loadModuleFile(path string, jsModule *js.Object) error {
 	}
 
 	return nil
+}
+
+func isFileOrDirectoryPath(path string) bool {
+	result := path == "." || path == ".." ||
+		strings.HasPrefix(path, "/") ||
+		strings.HasPrefix(path, "./") ||
+		strings.HasPrefix(path, "../")
+
+	if runtime.GOOS == "windows" {
+		result = result ||
+			strings.HasPrefix(path, `.\`) ||
+			strings.HasPrefix(path, `..\`) ||
+			filepath.IsAbs(path)
+	}
+
+	return result
 }
