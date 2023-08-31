@@ -44,9 +44,7 @@ func createURLSearchParamsConstructor(r *goja.Runtime) goja.Value {
 		if !goja.IsUndefined(v) {
 			switch v.ExportType() {
 			case reflectTypeString:
-				var str string
-				r.ExportTo(v, &str)
-				u = buildParamsFromString(str)
+				u = buildParamsFromString(v.String())
 			case reflectTypeObject:
 				u = buildParamsFromObject(r, v)
 			case reflectTypeArray:
@@ -102,45 +100,39 @@ func buildParamsFromArray(r *goja.Runtime, v goja.Value) *url.URL {
 	query := searchParams{}
 
 	o := v.ToObject(r)
-	ex := r.Try(func() {
-		r.ForOf(o, func(val goja.Value) bool {
-			obj := val.ToObject(r)
 
-			var name, value string
-			i := 0
-			// Use ForOf to determine if the object is iterable
-			r.ForOf(obj, func(val goja.Value) bool {
-				if i == 0 {
-					name = fmt.Sprintf("%v", val)
-					i++
-					return true
-				}
-				if i == 1 {
-					value = fmt.Sprintf("%v", val)
-					i++
-					return true
-				}
-				// Array isn't a tuple
-				panic(newInvalidTupleError(r))
-			})
-
-			// Ensure we have two values
-			if i <= 1 {
-				panic(newInvalidTupleError(r))
+	r.ForOf(o, func(val goja.Value) bool {
+		obj := val.ToObject(r)
+		var name, value string
+		i := 0
+		// Use ForOf to determine if the object is iterable
+		r.ForOf(obj, func(val goja.Value) bool {
+			if i == 0 {
+				name = fmt.Sprintf("%v", val)
+				i++
+				return true
 			}
-
-			query = append(query, searchParam{
-				name:  name,
-				value: value,
-			})
-
-			return true
+			if i == 1 {
+				value = fmt.Sprintf("%v", val)
+				i++
+				return true
+			}
+			// Array isn't a tuple
+			panic(newInvalidTupleError(r))
 		})
-	})
 
-	if ex != nil {
-		panic(newInvalidTupleError(r))
-	}
+		// Ensure we have two values
+		if i <= 1 {
+			panic(newInvalidTupleError(r))
+		}
+
+		query = append(query, searchParam{
+			name:  name,
+			value: value,
+		})
+
+		return true
+	})
 
 	u, _ := url.Parse("")
 	u.RawQuery = query.String()
@@ -150,20 +142,14 @@ func buildParamsFromArray(r *goja.Runtime, v goja.Value) *url.URL {
 func buildParamsFromMap(r *goja.Runtime, v goja.Value) *url.URL {
 	query := searchParams{}
 	o := v.ToObject(r)
-	ex := r.Try(func() {
-		r.ForOf(o, func(val goja.Value) bool {
-			obj := val.ToObject(r)
-			query = append(query, searchParam{
-				name:  obj.Get("0").String(),
-				value: stringFromValue(r, obj.Get("1")),
-			})
-			return true
+	r.ForOf(o, func(val goja.Value) bool {
+		obj := val.ToObject(r)
+		query = append(query, searchParam{
+			name:  obj.Get("0").String(),
+			value: stringFromValue(r, obj.Get("1")),
 		})
+		return true
 	})
-
-	if ex != nil {
-		panic(ex)
-	}
 
 	u, _ := url.Parse("")
 	u.RawQuery = query.String()

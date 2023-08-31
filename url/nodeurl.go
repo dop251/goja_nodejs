@@ -16,13 +16,11 @@ func (sp *searchParam) Encode() string {
 }
 
 func (sp *searchParam) string(encode bool) string {
-	vals := []string{}
 	if encode {
-		vals = append(vals, fmt.Sprintf("%s=%s", url.QueryEscape(sp.name), url.QueryEscape(sp.value)))
+		return fmt.Sprintf("%s=%s", url.QueryEscape(sp.name), url.QueryEscape(sp.value))
 	} else {
-		vals = append(vals, fmt.Sprintf("%s=%s", sp.name, sp.value))
+		return fmt.Sprintf("%s=%s", sp.name, sp.value)
 	}
-	return strings.Join(vals, "&")
 }
 
 type searchParams []searchParam
@@ -85,7 +83,7 @@ func (nu *nodeURL) hasName(name string) bool {
 }
 
 func (nu *nodeURL) getValues(name string) []string {
-	vals := []string{}
+	var vals []string
 	for _, v := range nu.searchParams {
 		if v.name == name {
 			vals = append(vals, v.value)
