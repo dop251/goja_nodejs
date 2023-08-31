@@ -204,19 +204,26 @@ func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
 
 		u := toURL(r, call.This)
 		name := call.Argument(0).String()
-		arr := searchParams{}
-		for _, v := range u.searchParams {
-			if v.name != name {
-				arr = append(arr, v)
-			} else {
+		isValid := func(v searchParam) bool {
+			if len(call.Arguments) == 1 {
+				return v.name != name
+			} else if v.name == name {
 				arg := call.Argument(1)
-				if !goja.IsUndefined(arg) && v.value != arg.String() {
-					arr = append(arr, v)
+				if !goja.IsUndefined(arg) && v.value == arg.String() {
+					return false
 				}
 			}
+			return true
 		}
 
-		u.searchParams = arr
+		i := 0
+		for _, v := range u.searchParams {
+			if isValid(v) {
+				u.searchParams[i] = v
+				i++
+			}
+		}
+		u.searchParams = u.searchParams[:i]
 		u.syncSearchParams()
 
 		return goja.Undefined()
