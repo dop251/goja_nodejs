@@ -87,7 +87,7 @@ func buildParamsFromObject(r *goja.Runtime, v goja.Value) *url.URL {
 
 	o := v.ToObject(r)
 	for _, k := range o.Keys() {
-		val := stringFromValue(r, o.Get(k))
+		val := o.Get(k).String()
 		query = append(query, searchParam{name: k, value: val})
 	}
 
@@ -146,7 +146,7 @@ func buildParamsFromMap(r *goja.Runtime, v goja.Value) *url.URL {
 		obj := val.ToObject(r)
 		query = append(query, searchParam{
 			name:  obj.Get("0").String(),
-			value: stringFromValue(r, obj.Get("1")),
+			value: obj.Get("1").String(),
 		})
 		return true
 	})
@@ -154,29 +154,6 @@ func buildParamsFromMap(r *goja.Runtime, v goja.Value) *url.URL {
 	u, _ := url.Parse("")
 	u.RawQuery = query.String()
 	return u
-}
-
-func stringFromValue(r *goja.Runtime, v goja.Value) string {
-	switch v.ExportType() {
-	case reflectTypeString, reflectTypeInt:
-		return v.String()
-	case reflectTypeArray:
-		vals := []string{}
-		ex := r.Try(func() {
-			r.ForOf(v, func(val goja.Value) bool {
-				vals = append(vals, fmt.Sprintf("%v", val))
-				return true
-			})
-		})
-		if ex != nil {
-			panic(ex)
-		}
-		return strings.Join(vals, ",")
-	case reflectTypeObject:
-		return "[object Object]"
-	default:
-		return fmt.Sprintf("%v", v)
-	}
 }
 
 func createURLSearchParamsPrototype(r *goja.Runtime) *goja.Object {
