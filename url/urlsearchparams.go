@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"reflect"
 	"sort"
-	"strings"
 
 	"github.com/dop251/goja"
 )
@@ -35,8 +34,6 @@ func newError(r *goja.Runtime, code string, msg string) *goja.Object {
 	return o
 }
 
-// Currently not supporting the following:
-//   - ctor(iterable): Using function generators
 func createURLSearchParamsConstructor(r *goja.Runtime) goja.Value {
 	f := r.ToValue(func(call goja.ConstructorCall) *goja.Object {
 		u, _ := url.Parse("")
@@ -46,11 +43,11 @@ func createURLSearchParamsConstructor(r *goja.Runtime) goja.Value {
 			case reflectTypeString:
 				u = buildParamsFromString(v.String())
 			case reflectTypeObject:
-				u = buildParamsFromObject(r, v)
+				u = buildParamsFromObject(r, v.ToObject(r))
 			case reflectTypeArray:
-				u = buildParamsFromArray(r, v)
+				u = buildParamsFromIterable(r, v.ToObject(r))
 			case reflectTypeMap:
-				u = buildParamsFromMap(r, v)
+				u = buildParamsFromMap(r, v.ToObject(r))
 			}
 		}
 
@@ -82,10 +79,14 @@ func buildParamsFromString(s string) *url.URL {
 	return u
 }
 
-func buildParamsFromObject(r *goja.Runtime, v goja.Value) *url.URL {
+func buildParamsFromObject(r *goja.Runtime, o *goja.Object) *url.URL {
 	query := searchParams{}
 
-	o := v.ToObject(r)
+	// Covers usecase where object might be a function generator.
+	if o.GetSymbol(goja.SymIterator) != nil {
+		return buildParamsFromIterable(r, o)
+	}
+
 	for _, k := range o.Keys() {
 		val := o.Get(k).String()
 		query = append(query, searchParam{name: k, value: val})
@@ -96,10 +97,8 @@ func buildParamsFromObject(r *goja.Runtime, v goja.Value) *url.URL {
 	return u
 }
 
-func buildParamsFromArray(r *goja.Runtime, v goja.Value) *url.URL {
+func buildParamsFromIterable(r *goja.Runtime, o *goja.Object) *url.URL {
 	query := searchParams{}
-
-	o := v.ToObject(r)
 
 	r.ForOf(o, func(val goja.Value) bool {
 		obj := val.ToObject(r)
@@ -139,9 +138,9 @@ func buildParamsFromArray(r *goja.Runtime, v goja.Value) *url.URL {
 	return u
 }
 
-func buildParamsFromMap(r *goja.Runtime, v goja.Value) *url.URL {
+func buildParamsFromMap(r *goja.Runtime, o *goja.Object) *url.URL {
 	query := searchParams{}
-	o := v.ToObject(r)
+
 	r.ForOf(o, func(val goja.Value) bool {
 		obj := val.ToObject(r)
 		query = append(query, searchParam{

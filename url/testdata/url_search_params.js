@@ -127,3 +127,13 @@ assert.sameValue(params.toString(), "query%5B%5D=abc&query%5B%5D=123&type=search
 
 params = new URLSearchParams("query=first&query=second&user=abc");
 assert.sameValue(params.size, 3);
+
+function* functionGeneratorExample() {
+  yield ["user", "abc"];
+  yield ["query", "first"];
+  yield ["query", "second"];
+}
+
+params = new URLSearchParams(functionGeneratorExample());
+console.log(params.toString());
+assert.sameValue(params.toString(), "user=abc&query=first&query=second");
