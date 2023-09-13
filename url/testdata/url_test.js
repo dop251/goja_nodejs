@@ -24,11 +24,22 @@ testURLCtor("HTTPS://á.com:123", "https://xn--1ca.com:123/");
 testURLCtor("https://test.com#asdfá", "https://test.com/#asdf%C3%A1");
 testURLCtor("HTTPS://á.com:123/á", "https://xn--1ca.com:123/%C3%A1");
 testURLCtor("fish://á.com", "fish://%C3%A1.com");
-testURLCtor("https://test.com/?a=1 /2", "https://test.com/?a=1+%2F2");
+testURLCtor("https://test.com/?a=1 /2", "https://test.com/?a=1%20/2");
 testURLCtor("https://test.com/á=1?á=1&ü=2#é", "https://test.com/%C3%A1=1?%C3%A1=1&%C3%BC=2#%C3%A9");
 
 assert.throws(() => new URL("test"), TypeError);
 assert.throws(() => new URL("ssh://EEE:ddd"), TypeError);
+
+{
+    let u = new URL("https://example.org/");
+    assert.sameValue(u.__proto__.constructor, URL);
+    assert.sameValue(u instanceof URL, true);
+}
+
+{
+    let u = new URL("https://example.org/");
+    assert.sameValue(u.searchParams, u.searchParams);
+}
 
 let myURL;
 
@@ -109,9 +120,9 @@ testSetPort("", "");
 
 // Completely invalid port strings are ignored
 testSetPort("abcd", "8888");
-testSetPort("-123", "8888");
-testSetPort(-123, "8888");
-testSetPort(-123.45, "8888");
+testSetPort("-123", "");
+testSetPort(-123, "");
+testSetPort(-123.45, "");
 testSetPort(undefined, "8888");
 testSetPort(null, "8888");
 testSetPort(+Infinity, "8888");
@@ -120,7 +131,7 @@ testSetPort(NaN, "8888");
 
 // Leading numbers are treated as a port number
 testSetPort("5678abcd", "5678");
-testSetPort("a5678abcd", "8888");
+testSetPort("a5678abcd", "");
 
 // Non-integers are truncated
 testSetPort(1234.5678, "1234");
@@ -202,7 +213,5 @@ myURL.searchParams.append("user", "abc");
 assert.sameValue(myURL.toString(), "https://example.com/?user=abc");
 myURL.searchParams.append("first", "one");
 assert.sameValue(myURL.toString(), "https://example.com/?user=abc&first=one");
-myURL.searchParams = new URLSearchParams("query=something");
-assert.sameValue(myURL.toString(), "https://example.com/?query=something");
-myURL.searchParams.delete("query");
-assert.sameValue(myURL.toString(), "https://example.com/");
+myURL.searchParams.delete("user");
+assert.sameValue(myURL.toString(), "https://example.com/?first=one");
