@@ -57,6 +57,26 @@ const assert = {
             return;
         }
         throw new Error(message + "No exception was thrown");
+    },
+
+    throwsNodeError(f, ctor, code, message) {
+        if (message === undefined) {
+            message = '';
+        } else {
+            message += ' ';
+        }
+        try {
+            f();
+        } catch (e) {
+            if (e.constructor !== ctor) {
+                throw new Error(message + "Wrong exception type was thrown: " + e.constructor.name);
+            }
+            if (e.code !== code) {
+                throw new Error(message + "Wrong exception code was thrown: " + e.code);
+            }
+            return;
+        }
+        throw new Error(message + "No exception was thrown");
     }
 }
 
