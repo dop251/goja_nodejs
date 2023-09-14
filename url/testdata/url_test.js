@@ -215,3 +215,15 @@ myURL.searchParams.append("first", "one");
 assert.sameValue(myURL.toString(), "https://example.com/?user=abc&first=one");
 myURL.searchParams.delete("user");
 assert.sameValue(myURL.toString(), "https://example.com/?first=one");
+
+{
+    const url = require("url");
+
+    assert.sameValue(url.domainToASCII('español.com'), "xn--espaol-zwa.com");
+    assert.sameValue(url.domainToASCII('中文.com'), "xn--fiq228c.com");
+    assert.sameValue(url.domainToASCII('xn--iñvalid.com'), "");
+
+    assert.sameValue(url.domainToUnicode('xn--espaol-zwa.com'), "español.com");
+    assert.sameValue(url.domainToUnicode('xn--fiq228c.com'), "中文.com");
+    assert.sameValue(url.domainToUnicode('xn--iñvalid.com'), "");
+}

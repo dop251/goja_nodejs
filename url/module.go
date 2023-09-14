@@ -21,11 +21,14 @@ func Require(runtime *goja.Runtime, module *goja.Object) {
 	}
 	exports.Set("URL", m.createURLConstructor())
 	exports.Set("URLSearchParams", m.createURLSearchParamsConstructor())
+	exports.Set("domainToASCII", m.domainToASCII)
+	exports.Set("domainToUnicode", m.domainToUnicode)
 }
 
 func Enable(runtime *goja.Runtime) {
-	runtime.Set("URL", require.Require(runtime, ModuleName).ToObject(runtime).Get("URL"))
-	runtime.Set("URLSearchParams", require.Require(runtime, ModuleName).ToObject(runtime).Get("URLSearchParams"))
+	m := require.Require(runtime, ModuleName).ToObject(runtime)
+	runtime.Set("URL", m.Get("URL"))
+	runtime.Set("URLSearchParams", m.Get("URLSearchParams"))
 }
 
 func init() {

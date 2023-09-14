@@ -387,3 +387,19 @@ func (m *urlModule) createURLConstructor() goja.Value {
 	proto.DefineDataProperty("constructor", f, goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE)
 	return f
 }
+
+func (m *urlModule) domainToASCII(domUnicode string) string {
+	res, err := idna.ToASCII(domUnicode)
+	if err != nil {
+		return ""
+	}
+	return res
+}
+
+func (m *urlModule) domainToUnicode(domASCII string) string {
+	res, err := idna.ToUnicode(domASCII)
+	if err != nil {
+		return ""
+	}
+	return res
+}
