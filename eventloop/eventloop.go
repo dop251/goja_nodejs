@@ -45,8 +45,9 @@ type EventLoop struct {
 	stopCond *sync.Cond
 	running  bool
 
-	enableConsole bool
-	registry      *require.Registry
+	enableConsole  bool
+	enableRegistry bool
+	registry       *require.Registry
 }
 
 func NewEventLoop(opts ...Option) *EventLoop {
@@ -57,18 +58,21 @@ func NewEventLoop(opts ...Option) *EventLoop {
 		jobChan:       make(chan func()),
 		wakeupChan:    make(chan struct{}, 1),
 		enableConsole: true,
+		enableRegistry: true,
 	}
 	loop.stopCond = sync.NewCond(&loop.stopLock)
 
 	for _, opt := range opts {
 		opt(loop)
 	}
-	if loop.registry == nil {
-		loop.registry = new(require.Registry)
-	}
-	loop.registry.Enable(vm)
-	if loop.enableConsole {
-		console.Enable(vm)
+	if loop.enableRegistry {
+		if loop.registry == nil {
+			loop.registry = new(require.Registry)
+		}
+		loop.registry.Enable(vm)
+		if loop.enableConsole {
+			console.Enable(vm)
+		}
 	}
 	vm.Set("setTimeout", loop.setTimeout)
 	vm.Set("setInterval", loop.setInterval)
@@ -95,6 +99,19 @@ func EnableConsole(enableConsole bool) Option {
 func WithRegistry(registry *require.Registry) Option {
 	return func(loop *EventLoop) {
 		loop.registry = registry
+	}
+}
+
+// EnableRegistry controls whether the "require" module is loaded into
+// the runtime used by the loop.  By default, loops are created with
+// the "require" module loaded, pass EnableRegistry(false) to
+// NewEventLoop to disable this behavior.
+// 
+// Note: If you disabled the "require" module, the "console" module
+// won't be load even if you passed EnableConsole(true)
+func EnableRegistry(enableRegistry bool) Option {
+	return func(loop *EventLoop) {
+		loop.enableRegistry = enableRegistry
 	}
 }
 
