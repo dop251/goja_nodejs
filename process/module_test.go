@@ -37,11 +37,11 @@ func TestProcessEnvValuesArtificial(t *testing.T) {
 	jsRes, err := vm.RunString("process.env['GOJA_IS_AWESOME']")
 
 	if err != nil {
-		t.Fatal(fmt.Sprintf("Error executing: %s", err))
+		t.Fatalf("Error executing: %s", err)
 	}
 
 	if jsRes.String() != "true" {
-		t.Fatal(fmt.Sprintf("Error executing: got %s but expected %s", jsRes, "true"))
+		t.Fatalf("Error executing: got %s but expected %s", jsRes, "true")
 	}
 }
 
@@ -58,11 +58,11 @@ func TestProcessEnvValuesBrackets(t *testing.T) {
 		jsRes, err := vm.RunString(jsExpr)
 
 		if err != nil {
-			t.Fatal(fmt.Sprintf("Error executing %s: %s", jsExpr, err))
+			t.Fatalf("Error executing %s: %s", jsExpr, err)
 		}
 
 		if jsRes.String() != envKeyValue[1] {
-			t.Fatal(fmt.Sprintf("Error executing %s: got %s but expected %s", jsExpr, jsRes, envKeyValue[1]))
+			t.Fatalf("Error executing %s: got %s but expected %s", jsExpr, jsRes, envKeyValue[1])
 		}
 	}
 }
