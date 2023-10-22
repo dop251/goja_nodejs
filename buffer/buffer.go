@@ -11,6 +11,7 @@ import (
 	"github.com/dop251/goja_nodejs/errors"
 	"github.com/dop251/goja_nodejs/require"
 
+	"github.com/dop251/base64dec"
 	"golang.org/x/text/encoding/unicode"
 )
 
@@ -192,7 +193,7 @@ func (base64Codec) Encode(b []byte) string {
 }
 
 func (base64UrlCodec) Encode(b []byte) string {
-	return base64.URLEncoding.EncodeToString(b)
+	return base64.RawURLEncoding.EncodeToString(b)
 }
 
 var utf8Codec StringCodec = _utf8Codec{}
@@ -219,17 +220,10 @@ func expandSlice(b []byte, l int) (dst, res []byte) {
 }
 
 func Base64DecodeAppend(dst []byte, src string) ([]byte, error) {
-	l := base64.StdEncoding.DecodedLen(len(src))
+	l := base64.RawStdEncoding.DecodedLen(len(src))
 	d, res := expandSlice(dst, l)
-	srcBytes := []byte(src)
-	n, err := base64.StdEncoding.Decode(d, srcBytes)
-	if errPos, ok := err.(base64.CorruptInputError); ok {
-		if ch := src[errPos]; ch == '-' || ch == '_' {
-			start := int(errPos / 4 * 3)
-			n, err = base64.URLEncoding.Decode(d[start:], srcBytes[errPos&^3:])
-			n += start
-		}
-	}
+	n, err := base64dec.DecodeBase64(d, src)
+
 	res = res[:len(dst)+n]
 	return res, err
 }

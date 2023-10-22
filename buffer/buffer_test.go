@@ -105,6 +105,12 @@ func TestFromBase64(t *testing.T) {
 		}
 	}
 
+	{
+		let s = Buffer.from("AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow", "base64Url").toString("base64");
+		if (s !== "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ+EstJQLr/T+1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow==") {
+			throw new Error(s);
+		}
+	}
 	`)
 
 	if err != nil {

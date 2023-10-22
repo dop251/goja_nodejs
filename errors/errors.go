@@ -7,9 +7,10 @@ import (
 )
 
 const (
-	ErrCodeInvalidArgType = "ERR_INVALID_ARG_TYPE"
-	ErrCodeInvalidThis    = "ERR_INVALID_THIS"
-	ErrCodeMissingArgs    = "ERR_MISSING_ARGS"
+	ErrCodeInvalidArgType  = "ERR_INVALID_ARG_TYPE"
+	ErrCodeInvalidArgValue = "ERR_INVALID_ARG_VALUE"
+	ErrCodeInvalidThis     = "ERR_INVALID_THIS"
+	ErrCodeMissingArgs     = "ERR_MISSING_ARGS"
 )
 
 func error_toString(call goja.FunctionCall, r *goja.Runtime) goja.Value {
