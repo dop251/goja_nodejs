@@ -70,9 +70,9 @@ func NewEventLoop(opts ...Option) *EventLoop {
 			loop.registry = new(require.Registry)
 		}
 		loop.registry.Enable(vm)
-		if loop.enableConsole {
-			console.Enable(vm)
-		}
+	}
+	if loop.enableConsole {
+		console.Enable(vm)
 	}
 	vm.Set("setTimeout", loop.setTimeout)
 	vm.Set("setInterval", loop.setInterval)
@@ -106,9 +106,6 @@ func WithRegistry(registry *require.Registry) Option {
 // the runtime used by the loop.  By default, loops are created with
 // the "require" module loaded, pass EnableRegistry(false) to
 // NewEventLoop to disable this behavior.
-// 
-// Note: If you disabled the "require" module, the "console" module
-// won't be load even if you passed EnableConsole(true)
 func EnableRegistry(enableRegistry bool) Option {
 	return func(loop *EventLoop) {
 		loop.enableRegistry = enableRegistry
