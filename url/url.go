@@ -344,11 +344,13 @@ func (m *urlModule) createURLPrototype() *goja.Object {
 
 	// search Params
 	m.defineURLAccessorProp(p, "searchParams", func(u *nodeURL) interface{} {
-		sp := parseSearchQuery(u.url.RawQuery)
-		if sp == nil {
-			sp = make(searchParams, 0)
+		if u.searchParams == nil {
+			sp := parseSearchQuery(u.url.RawQuery)
+			if sp == nil {
+				sp = make(searchParams, 0)
+			}
+			u.searchParams = sp
 		}
-		u.searchParams = sp
 		return m.newURLSearchParams((*urlSearchParams)(u))
 	}, nil)
 

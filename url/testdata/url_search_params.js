@@ -300,8 +300,15 @@ assert.sameValue(params instanceof URLSearchParams, true);
 
 {
     const url = new URL("https://test.com/");
+    url.searchParams.append("a", "1");
+    url.searchParams.append("b", "1");
+    assert.sameValue(url.toString(), "https://test.com/?a=1&b=1");
+}
+
+{
+    const url = new URL("https://test.com/");
     const params = url.searchParams;
-    params.append("a", "1");
+    url.searchParams.append("a", "1");
     assert.sameValue(url.search, "?a=1");
 }
 
@@ -317,6 +324,13 @@ assert.sameValue(params instanceof URLSearchParams, true);
     const params = url.searchParams;
     params.set("a", "1");
     assert.sameValue(url.search, "?a=1");
+}
+
+{
+    const url = new URL("https://test.com/");
+    url.searchParams.set("a", "1");
+    url.searchParams.set("b", "1");
+    assert.sameValue(url.toString(), "https://test.com/?a=1&b=1");
 }
 
 {
