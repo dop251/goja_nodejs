@@ -444,3 +444,44 @@ func TestEventLoop_StopNoWait(t *testing.T) {
 		t.Fatal("ran != 0")
 	}
 }
+
+func TestEventLoop_ClearRunningTimeout(t *testing.T) {
+	t.Parallel()
+	const SCRIPT = `
+	var called = 0;
+	let aTimer;
+	function a() {
+		if (++called > 5) {
+			return;
+		}
+		if (aTimer) {
+			clearTimeout(aTimer);
+		}
+		console.log("ok");
+		aTimer = setTimeout(a, 500);
+	}
+	a();`
+
+	prg, err := goja.Compile("main.js", SCRIPT, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loop := NewEventLoop()
+
+	loop.Run(func(vm *goja.Runtime) {
+		_, err = vm.RunProgram(prg)
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var called int64
+	loop.Run(func(vm *goja.Runtime) {
+		called = vm.Get("called").ToInteger()
+	})
+	if called != 6 {
+		t.Fatal(called)
+	}
+}

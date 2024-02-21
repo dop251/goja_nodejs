@@ -343,9 +343,9 @@ func (loop *EventLoop) addImmediate(f func()) *Immediate {
 
 func (loop *EventLoop) doTimeout(t *Timer) {
 	if !t.cancelled {
-		t.fn()
 		t.cancelled = true
 		loop.jobCount--
+		t.fn()
 	}
 }
 
@@ -357,9 +357,9 @@ func (loop *EventLoop) doInterval(i *Interval) {
 
 func (loop *EventLoop) doImmediate(i *Immediate) {
 	if !i.cancelled {
-		i.fn()
 		i.cancelled = true
 		loop.jobCount--
+		i.fn()
 	}
 }
 
