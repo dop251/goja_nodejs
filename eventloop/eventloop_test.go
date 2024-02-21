@@ -444,3 +444,31 @@ func TestEventLoop_StopNoWait(t *testing.T) {
 		t.Fatal("ran != 0")
 	}
 }
+
+func TestEventLoop_OrderOfJobCountDecrement(t *testing.T) {
+	t.Parallel()
+	const SCRIPT = `
+	let aTimer;
+	aTimer = setTimeout(function() {
+		clearTimeout(aTimer);
+	}, 100);
+	`
+
+	prg, err := goja.Compile("main.js", SCRIPT, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loop := NewEventLoop()
+	loop.Start()
+
+	loop.RunOnLoop(func(vm *goja.Runtime) {
+		vm.RunProgram(prg)
+	})
+
+	time.Sleep(2 * time.Second)
+	remainingJobs := loop.Stop()
+	if remainingJobs != 0 {
+		t.Fatalf("jobCount: %d", remainingJobs)
+	}
+}
