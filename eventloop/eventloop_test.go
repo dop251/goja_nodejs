@@ -12,10 +12,10 @@ import (
 func TestRun(t *testing.T) {
 	t.Parallel()
 	const SCRIPT = `
+	var calledAt;
 	setTimeout(function() {
-		console.log("ok");
+		calledAt = now();
 	}, 1000);
-	console.log("Started");
 	`
 
 	loop := NewEventLoop()
@@ -23,18 +23,36 @@ func TestRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	startTime := time.Now()
 	loop.Run(func(vm *goja.Runtime) {
-		vm.RunProgram(prg)
+		vm.Set("now", time.Now)
+		_, err = vm.RunProgram(prg)
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var calledAt time.Time
+	loop.Run(func(vm *goja.Runtime) {
+		err = vm.ExportTo(vm.Get("calledAt"), &calledAt)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calledAt.IsZero() {
+		t.Fatal("Not called")
+	}
+	if dur := calledAt.Sub(startTime); dur < time.Second {
+		t.Fatal(dur)
+	}
 }
 
 func TestStart(t *testing.T) {
 	t.Parallel()
 	const SCRIPT = `
+	var calledAt;
 	setTimeout(function() {
-		console.log("ok");
+		calledAt = now();
 	}, 1000);
-	console.log("Started");
 	`
 
 	prg, err := goja.Compile("main.js", SCRIPT, false)
@@ -43,14 +61,32 @@ func TestStart(t *testing.T) {
 	}
 
 	loop := NewEventLoop()
+	startTime := time.Now()
 	loop.Start()
 
 	loop.RunOnLoop(func(vm *goja.Runtime) {
+		vm.Set("now", time.Now)
 		vm.RunProgram(prg)
 	})
 
 	time.Sleep(2 * time.Second)
-	loop.Stop()
+	if remainingJobs := loop.Stop(); remainingJobs != 0 {
+		t.Fatal(remainingJobs)
+	}
+
+	var calledAt time.Time
+	loop.Run(func(vm *goja.Runtime) {
+		err = vm.ExportTo(vm.Get("calledAt"), &calledAt)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calledAt.IsZero() {
+		t.Fatal("Not called")
+	}
+	if dur := calledAt.Sub(startTime); dur < time.Second {
+		t.Fatal(dur)
+	}
 }
 
 func TestInterval(t *testing.T) {
@@ -71,27 +107,40 @@ func TestInterval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	loop.Run(func(vm *goja.Runtime) {
-		vm.RunProgram(prg)
+		_, err = vm.RunProgram(prg)
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var count int64
+	loop.Run(func(vm *goja.Runtime) {
+		count = vm.Get("count").ToInteger()
+	})
+	if count != 3 {
+		t.Fatal(count)
+	}
 }
 
 func TestImmediate(t *testing.T) {
 	t.Parallel()
 	const SCRIPT = `
-	var cb = function(arg) {
-		console.log(arg);
+	let log = [];
+	function cb(arg) {
+		log.push(arg);
 	}
 	var i;
 	var t = setImmediate(function() {
-		console.log("tick");
+		cb("tick");
 		setImmediate(cb, "tick 2");
 		i = setImmediate(cb, "should not run")
 	});
 	setImmediate(function() {
 		clearImmediate(i);
 	});
-	console.log("Started");
+	cb("Started");
 	`
 
 	loop := NewEventLoop()
@@ -100,8 +149,25 @@ func TestImmediate(t *testing.T) {
 		t.Fatal(err)
 	}
 	loop.Run(func(vm *goja.Runtime) {
-		vm.RunProgram(prg)
+		_, err = vm.RunProgram(prg)
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loop.Run(func(vm *goja.Runtime) {
+		_, err = vm.RunString(`
+		if (log.length != 3) {
+			throw new Error("Invalid log length: " + log);
+		}
+		if (log[0] !== "Started" || log[1] !== "tick" || log[2] !== "tick 2") {
+			throw new Error("Invalid log: " + log);
+		}
+		`)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestRunNoSchedule(t *testing.T) {
