@@ -77,9 +77,13 @@ func (r *RequireModule) loadNative(path string) (*js.Object, error) {
 
 	var isBuiltIn, withPrefix bool
 	if ldr == nil {
+		moduleMutex.RLock()
 		ldr = builtin[path]
+		moduleMutex.RUnlock()
 		if ldr == nil && strings.HasPrefix(path, NodePrefix) {
+			moduleMutex.RLock()
 			ldr = builtin[path[len(NodePrefix):]]
+			moduleMutex.RUnlock()
 			if ldr == nil {
 				return nil, NoSuchBuiltInModuleError
 			}

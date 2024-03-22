@@ -31,6 +31,7 @@ var (
 )
 
 var native, builtin map[string]ModuleLoader
+var moduleMutex sync.RWMutex
 
 // Registry contains a cache of compiled modules which can be used by multiple Runtimes
 type Registry struct {
@@ -242,5 +243,7 @@ func RegisterCoreModule(name string, loader ModuleLoader) {
 		builtin = make(map[string]ModuleLoader)
 	}
 	name = filepathClean(name)
+	moduleMutex.Lock()
 	builtin[name] = loader
+	moduleMutex.Unlock()
 }
