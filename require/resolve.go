@@ -13,6 +13,8 @@ import (
 
 const NodePrefix = "node:"
 
+var DefaultModuleExtensions = []string{".js", ".json"}
+
 // NodeJS module search algorithm described by
 // https://nodejs.org/api/modules.html#modules_all_together
 func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
@@ -115,28 +117,30 @@ func (r *RequireModule) loadAsFileOrDirectory(path string) (module *js.Object, e
 	return r.loadAsDirectory(path)
 }
 
+func (r *RequireModule) supportedExtensions() []string {
+	extensions := r.r.loadExtensions
+
+	if extensions == nil {
+		return DefaultModuleExtensions
+	}
+	return extensions
+}
+func (r *RequireModule) loadAsFileExtension(path string, extensions ...string) (module *js.Object, err error) {
+	for _, extension := range extensions {
+		p := path + extension
+		if module, err = r.loadModule(p); module != nil || err != nil {
+			return
+		}
+	}
+	return
+}
+
 func (r *RequireModule) loadAsFile(path string) (module *js.Object, err error) {
-	if module, err = r.loadModule(path); module != nil || err != nil {
-		return
-	}
-
-	p := path + ".js"
-	if module, err = r.loadModule(p); module != nil || err != nil {
-		return
-	}
-
-	p = path + ".json"
-	return r.loadModule(p)
+	return r.loadAsFileExtension(path, append([]string{""}, r.supportedExtensions()...)...)
 }
 
 func (r *RequireModule) loadIndex(modpath string) (module *js.Object, err error) {
-	p := path.Join(modpath, "index.js")
-	if module, err = r.loadModule(p); module != nil || err != nil {
-		return
-	}
-
-	p = path.Join(modpath, "index.json")
-	return r.loadModule(p)
+	return r.loadAsFileExtension(path.Join(modpath, "index"), r.supportedExtensions()...)
 }
 
 func (r *RequireModule) loadAsDirectory(modpath string) (module *js.Object, err error) {

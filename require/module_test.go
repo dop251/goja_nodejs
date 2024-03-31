@@ -421,6 +421,73 @@ func TestResolve(t *testing.T) {
 	}
 }
 
+func TestResolveCustomExtensions(t *testing.T) {
+	testRequire := func(src, fpath string, extensions []string, fs map[string]string) (*js.Runtime, js.Value, error) {
+		vm := js.New()
+		r := NewRegistry(WithLoadExtensions(extensions...), WithLoader(mapFileSystemSourceLoader(fs)))
+		r.Enable(vm)
+		t.Logf("Require(%s)", fpath)
+		ret, err := vm.RunScript(path.Join(src, "test.js"), fmt.Sprintf("require('%s')", fpath))
+		if err != nil {
+			return nil, nil, err
+		}
+		return vm, ret, nil
+	}
+
+	fs := map[string]string{
+		"/home/src/app/app.js":     `exports.name = "app.js"`,
+		"/home/src/app/app.ts":     `exports.name = "app.ts"`,
+		"/home/src/app/app.json":   `{"name": "app.json"}`,
+		"/home/src/app/index.js":   `exports.name = "index.js"`,
+		"/home/src/app/index.ts":   `exports.name = "index.ts"`,
+		"/home/src/app/index.json": `exports.name = "index.json"`,
+	}
+
+	customExtensions := []string{".ts", ".js", ".json"}
+
+	for i, tc := range []struct {
+		src        string
+		path       string
+		extensions []string
+		ok         bool
+		field      string
+		value      string
+	}{
+		{"/home/src", "./app/app", nil, true, "name", "app.js"},
+		{"/home/src", "./app/app.json", nil, true, "name", "app.json"},
+		{"/home/src", "./app/app.ts", nil, true, "name", "app.ts"},
+		{"/home/src", "./app/app.mjs", nil, false, "name", ""},
+		{"/home/src", "./app", nil, true, "name", "index.js"},
+		{"/home/src", "./app/app", customExtensions, true, "name", "app.ts"},
+		{"/home/src", "./app/app.json", customExtensions, true, "name", "app.json"},
+		{"/home/src", "./app/app.ts", customExtensions, true, "name", "app.ts"},
+		{"/home/src", "./app/app.mjs", customExtensions, false, "name", ""},
+		{"/home/src", "./app", customExtensions, true, "name", "index.ts"},
+	} {
+		vm, mod, err := testRequire(tc.src, tc.path, tc.extensions, fs)
+		if err != nil {
+			if tc.ok {
+				t.Errorf("%d: require() failed: %v", i, err)
+			}
+			continue
+		} else {
+			if !tc.ok {
+				t.Errorf("%d: expected to fail, but did not", i)
+				continue
+			}
+		}
+		f := mod.ToObject(vm).Get(tc.field)
+		if f == nil {
+			t.Errorf("%v: field %q not found", i, tc.field)
+			continue
+		}
+		value := f.String()
+		if value != tc.value {
+			t.Errorf("%v: got %q expected %q", i, value, tc.value)
+		}
+	}
+}
+
 func TestRequireCycle(t *testing.T) {
 	vm := js.New()
 	r := NewRegistry(WithLoader(mapFileSystemSourceLoader(map[string]string{

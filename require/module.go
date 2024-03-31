@@ -38,8 +38,9 @@ type Registry struct {
 	native   map[string]ModuleLoader
 	compiled map[string]*js.Program
 
-	srcLoader     SourceLoader
-	globalFolders []string
+	srcLoader      SourceLoader
+	globalFolders  []string
+	loadExtensions []string
 }
 
 type RequireModule struct {
@@ -85,6 +86,15 @@ func WithLoader(srcLoader SourceLoader) Option {
 func WithGlobalFolders(globalFolders ...string) Option {
 	return func(r *Registry) {
 		r.globalFolders = globalFolders
+	}
+}
+
+// WithLoadExtensions sets a list of extensions to try while loading module files
+// Definition order matters as the first matched extension would be used as a result
+// Default extensions are defined as [".js", ".json"] at DefaultModuleExtensions variable
+func WithLoadExtensions(loadExtensions ...string) Option {
+	return func(r *Registry) {
+		r.loadExtensions = loadExtensions
 	}
 }
 
