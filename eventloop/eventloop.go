@@ -211,9 +211,11 @@ func (loop *EventLoop) Start() {
 	go loop.run(true)
 }
 
-// StartLooping starts the event loop in the current goroutine. The loop continues to run until Stop() is called.
+// StartInForeground starts the event loop in the current goroutine. The loop continues to run until Stop() is called.
 // If the loop is already started it will panic.
-func (loop *EventLoop) StartLooping() {
+// Use this instead of Start if you want to recover from panics that may occur while calling native Go functions from
+// within setInterval and setTimeout callbacks.
+func (loop *EventLoop) StartInForeground() {
 	loop.setRunning()
 	loop.run(true)
 }

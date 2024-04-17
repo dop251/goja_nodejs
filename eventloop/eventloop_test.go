@@ -89,7 +89,7 @@ func TestStart(t *testing.T) {
 	}
 }
 
-func TestStartLooping(t *testing.T) {
+func TestStartInForeground(t *testing.T) {
 	t.Parallel()
 	const SCRIPT = `
 	var calledAt;
@@ -105,7 +105,7 @@ func TestStartLooping(t *testing.T) {
 
 	loop := NewEventLoop()
 	startTime := time.Now()
-	go loop.StartLooping()
+	go loop.StartInForeground()
 
 	loop.RunOnLoop(func(vm *goja.Runtime) {
 		vm.Set("now", time.Now)
