@@ -211,6 +211,15 @@ func (loop *EventLoop) Start() {
 	go loop.run(true)
 }
 
+// StartInForeground starts the event loop in the current goroutine. The loop continues to run until Stop() is called.
+// If the loop is already started it will panic.
+// Use this instead of Start if you want to recover from panics that may occur while calling native Go functions from
+// within setInterval and setTimeout callbacks.
+func (loop *EventLoop) StartInForeground() {
+	loop.setRunning()
+	loop.run(true)
+}
+
 // Stop the loop that was started with Start(). After this function returns there will be no more jobs executed
 // by the loop. It is possible to call Start() or Run() again after this to resume the execution.
 // Note, it does not cancel active timeouts.

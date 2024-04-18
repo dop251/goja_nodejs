@@ -89,6 +89,49 @@ func TestStart(t *testing.T) {
 	}
 }
 
+func TestStartInForeground(t *testing.T) {
+	t.Parallel()
+	const SCRIPT = `
+	var calledAt;
+	setTimeout(function() {
+		calledAt = now();
+	}, 1000);
+	`
+
+	prg, err := goja.Compile("main.js", SCRIPT, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loop := NewEventLoop()
+	startTime := time.Now()
+	go loop.StartInForeground()
+
+	loop.RunOnLoop(func(vm *goja.Runtime) {
+		vm.Set("now", time.Now)
+		vm.RunProgram(prg)
+	})
+
+	time.Sleep(2 * time.Second)
+	if remainingJobs := loop.Stop(); remainingJobs != 0 {
+		t.Fatal(remainingJobs)
+	}
+
+	var calledAt time.Time
+	loop.Run(func(vm *goja.Runtime) {
+		err = vm.ExportTo(vm.Get("calledAt"), &calledAt)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calledAt.IsZero() {
+		t.Fatal("Not called")
+	}
+	if dur := calledAt.Sub(startTime); dur < time.Second {
+		t.Fatal(dur)
+	}
+}
+
 func TestInterval(t *testing.T) {
 	t.Parallel()
 	const SCRIPT = `
