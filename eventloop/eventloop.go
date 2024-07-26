@@ -163,11 +163,11 @@ func (loop *EventLoop) setImmediate(call goja.FunctionCall) goja.Value {
 func (loop *EventLoop) SetTimeout(fn func(*goja.Runtime), timeout time.Duration) *Timer {
 	t := loop.newTimeout(func() { fn(loop.vm) })
 	if loop.addAuxJob(func() {
+		t.start(loop, timeout)
 		loop.jobCount++
 		t.idx = len(loop.jobs)
 		loop.jobs = append(loop.jobs, &t.job)
 	}) {
-		t.start(loop, timeout)
 		return t
 	}
 	return nil
@@ -192,11 +192,11 @@ func (loop *EventLoop) ClearTimeout(t *Timer) {
 func (loop *EventLoop) SetInterval(fn func(*goja.Runtime), timeout time.Duration) *Interval {
 	i := loop.newInterval(func() { fn(loop.vm) })
 	if loop.addAuxJob(func() {
+		i.start(loop, timeout)
 		loop.jobCount++
 		i.idx = len(loop.jobs)
 		loop.jobs = append(loop.jobs, &i.job)
 	}) {
-		i.start(loop, timeout)
 		return i
 	}
 	return nil

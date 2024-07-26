@@ -373,6 +373,18 @@ func TestNativeClearInterval(t *testing.T) {
 	}
 }
 
+func TestSetAndClearOnStoppedLoop(t *testing.T) {
+	t.Parallel()
+	loop := NewEventLoop()
+	timeout := loop.SetTimeout(func(runtime *goja.Runtime) {
+		panic("must not run")
+	}, 1*time.Millisecond)
+	loop.ClearTimeout(timeout)
+	loop.Start()
+	time.Sleep(10 * time.Millisecond)
+	loop.Terminate()
+}
+
 func TestSetTimeoutConcurrent(t *testing.T) {
 	t.Parallel()
 	loop := NewEventLoop()
