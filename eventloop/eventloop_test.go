@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+
+	"go.uber.org/goleak"
 )
 
 func TestRun(t *testing.T) {
@@ -593,4 +595,35 @@ func TestEventLoop_ClearRunningTimeout(t *testing.T) {
 	if called != 6 {
 		t.Fatal(called)
 	}
+}
+
+func TestEventLoop_Terminate(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
+	loop := NewEventLoop()
+	loop.Start()
+	interval := loop.SetInterval(func(vm *goja.Runtime) {}, 10*time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
+	loop.ClearInterval(interval)
+	loop.Terminate()
+
+	if loop.SetTimeout(func(*goja.Runtime) {}, time.Millisecond) != nil {
+		t.Fatal("was able to SetTimeout()")
+	}
+	if loop.SetInterval(func(*goja.Runtime) {}, time.Millisecond) != nil {
+		t.Fatal("was able to SetInterval()")
+	}
+	if loop.RunOnLoop(func(*goja.Runtime) {}) {
+		t.Fatal("was able to RunOnLoop()")
+	}
+
+	ch := make(chan struct{})
+	loop.Start()
+	if !loop.RunOnLoop(func(runtime *goja.Runtime) {
+		close(ch)
+	}) {
+		t.Fatal("RunOnLoop() has failed after restart")
+	}
+	<-ch
+	loop.Terminate()
 }
