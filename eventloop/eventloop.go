@@ -254,7 +254,7 @@ func (loop *EventLoop) StartInForeground() {
 // Stop the loop that was started with Start(). After this function returns there will be no more jobs executed
 // by the loop. It is possible to call Start() or Run() again after this to resume the execution.
 // Note, it does not cancel active timeouts (use Terminate() instead if you want this).
-// It is not allowed to run Start() (or Run()) and Stop() concurrently.
+// It is not allowed to run Start() (or Run()) and Stop() or Terminate() concurrently.
 // Calling Stop() on a non-running loop has no effect.
 // It is not allowed to call Stop() from the loop, because it is synchronous and cannot complete until the loop
 // is not running any jobs. Use StopNoWait() instead.
@@ -281,12 +281,20 @@ func (loop *EventLoop) StopNoWait() {
 	loop.stopLock.Unlock()
 }
 
-// Terminate stops the loop and clears all active timeouts and interval. After it returns there are no
+// Terminate stops the loop and clears all active timeouts and intervals. After it returns there are no
 // active timers or goroutines associated with the loop. Any attempt to submit a task (by using RunOnLoop(),
 // SetTimeout() or SetInterval()) will not succeed.
 // After being terminated the loop can be restarted again by using Start() or Run().
+// This method must not be called concurrently with Stop*(), Start(), or Run().
 func (loop *EventLoop) Terminate() {
 	loop.Stop()
+
+	loop.auxJobsLock.Lock()
+	loop.terminated = true
+	loop.auxJobsLock.Unlock()
+
+	loop.runAux()
+
 	for i := 0; i < len(loop.jobs); i++ {
 		job := loop.jobs[i]
 		if !job.cancelled {
@@ -298,17 +306,8 @@ func (loop *EventLoop) Terminate() {
 		}
 	}
 
-	loop.auxJobsLock.Lock()
-	loop.terminated = true
-	loop.auxJobsLock.Unlock()
-
 	for len(loop.jobs) > 0 {
-		select {
-		case job := <-loop.jobChan:
-			job()
-		case <-loop.wakeupChan:
-			loop.runAux()
-		}
+		(<-loop.jobChan)()
 	}
 }
 
