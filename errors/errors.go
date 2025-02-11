@@ -11,6 +11,7 @@ const (
 	ErrCodeInvalidArgValue = "ERR_INVALID_ARG_VALUE"
 	ErrCodeInvalidThis     = "ERR_INVALID_THIS"
 	ErrCodeMissingArgs     = "ERR_MISSING_ARGS"
+	ErrCodedOutOfRange     = "ERR_OUT_OF_RANGE"
 )
 
 func error_toString(call goja.FunctionCall, r *goja.Runtime) goja.Value {

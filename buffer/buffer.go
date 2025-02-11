@@ -3,7 +3,10 @@ package buffer
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
+	"math"
+	"math/big"
 	"reflect"
 	"strconv"
 
@@ -404,6 +407,187 @@ func (b *Buffer) proto_equals(call goja.FunctionCall) goja.Value {
 	panic(errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The \"otherBuffer\" argument must be an instance of Buffer or Uint8Array."))
 }
 
+// readBigInt64BE reads a big-endian 64-bit signed integer from the buffer
+func (b *Buffer) readBigInt64BE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 8)
+	value := int64(binary.BigEndian.Uint64(bb[offset : offset+8]))
+
+	return b.r.ToValue(big.NewInt(value))
+}
+
+// readBigInt64LE reads a little-endian 64-bit signed integer from the buffer
+func (b *Buffer) readBigInt64LE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 8)
+	value := int64(binary.LittleEndian.Uint64(bb[offset : offset+8]))
+
+	return b.r.ToValue(big.NewInt(value))
+}
+
+// readBigUInt64BE reads a big-endian 64-bit unsigned integer from the buffer
+func (b *Buffer) readBigUInt64BE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 8)
+	value := binary.BigEndian.Uint64(bb[offset : offset+8])
+
+	return b.r.ToValue(new(big.Int).SetUint64(value))
+}
+
+// readBigUInt64LE reads a little-endian 64-bit unsigned integer from the buffer
+func (b *Buffer) readBigUInt64LE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 8)
+	value := binary.LittleEndian.Uint64(bb[offset : offset+8])
+
+	return b.r.ToValue(new(big.Int).SetUint64(value))
+}
+
+// readDoubleBE reads a big-endian 64-bit floating-point number from the buffer
+func (b *Buffer) readDoubleBE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 8)
+	value := binary.BigEndian.Uint64(bb[offset : offset+8])
+
+	return b.r.ToValue(math.Float64frombits(value))
+}
+
+// readDoubleLE reads a little-endian 64-bit floating-point number from the buffer
+func (b *Buffer) readDoubleLE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 8)
+	value := binary.LittleEndian.Uint64(bb[offset : offset+8])
+
+	return b.r.ToValue(math.Float64frombits(value))
+}
+
+// readFloatBE reads a big-endian 32-bit floating-point number from the buffer
+func (b *Buffer) readFloatBE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 4)
+	value := binary.BigEndian.Uint32(bb[offset : offset+4])
+
+	return b.r.ToValue(math.Float32frombits(value))
+}
+
+// readFloatLE reads a little-endian 32-bit floating-point number from the buffer
+func (b *Buffer) readFloatLE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 4)
+	value := binary.LittleEndian.Uint32(bb[offset : offset+4])
+
+	return b.r.ToValue(math.Float32frombits(value))
+}
+
+// readInt8 reads an 8-bit signed integer from the buffer
+func (b *Buffer) readInt8(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 1)
+	value := int8(bb[offset])
+
+	return b.r.ToValue(value)
+}
+
+// readInt16BE reads a big-endian 16-bit signed integer from the buffer
+func (b *Buffer) readInt16BE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 2)
+	value := int16(binary.BigEndian.Uint16(bb[offset : offset+2]))
+
+	return b.r.ToValue(value)
+}
+
+// readInt16LE reads a little-endian 16-bit signed integer from the buffer
+func (b *Buffer) readInt16LE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 2)
+	value := int16(binary.LittleEndian.Uint16(bb[offset : offset+2]))
+
+	return b.r.ToValue(value)
+}
+
+// readInt32BE reads a big-endian 32-bit signed integer from the buffer
+func (b *Buffer) readInt32BE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 4)
+	value := int32(binary.BigEndian.Uint32(bb[offset : offset+4]))
+
+	return b.r.ToValue(value)
+}
+
+// readInt32LE reads a little-endian 32-bit signed integer from the buffer
+func (b *Buffer) readInt32LE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 4)
+	value := int32(binary.LittleEndian.Uint32(bb[offset : offset+4]))
+
+	return b.r.ToValue(value)
+}
+
+// readUInt8 reads an 8-bit unsigned integer from the buffer
+func (b *Buffer) readUInt8(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 1)
+	value := bb[offset]
+
+	return b.r.ToValue(value)
+}
+
+// readUInt16BE reads a big-endian 16-bit unsigned integer from the buffer
+func (b *Buffer) readUInt16BE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 2)
+	value := binary.BigEndian.Uint16(bb[offset : offset+2])
+
+	return b.r.ToValue(value)
+}
+
+// readUInt16LE reads a little-endian 16-bit unsigned integer from the buffer
+func (b *Buffer) readUInt16LE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 2)
+	value := binary.LittleEndian.Uint16(bb[offset : offset+2])
+
+	return b.r.ToValue(value)
+}
+
+// readUInt32BE reads a big-endian 32-bit unsigned integer from the buffer
+func (b *Buffer) readUInt32BE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 4)
+	value := binary.BigEndian.Uint32(bb[offset : offset+4])
+
+	return b.r.ToValue(value)
+}
+
+// readUInt32LE reads a little-endian 32-bit unsigned integer from the buffer
+func (b *Buffer) readUInt32LE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset := b.getOffsetArgument(call, 0, bb, 4)
+	value := binary.LittleEndian.Uint32(bb[offset : offset+4])
+
+	return b.r.ToValue(value)
+}
+
+func (b *Buffer) getOffsetArgument(call goja.FunctionCall, argIndex int, bb []byte, numBytes int64) int64 {
+	arg := call.Argument(argIndex)
+	var offset int64
+	if isNumber(arg) {
+		offset = arg.ToInteger()
+	} else if goja.IsUndefined(arg) {
+		// optional arg that defaults to zero
+		offset = 0
+	} else {
+		panic(errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The \"offset\" argument must be of type number."))
+	}
+
+	if offset < 0 || offset+numBytes > int64(len(bb)) {
+		panic(errors.NewError(b.r, nil, errors.ErrCodedOutOfRange, "The value of \"offset\" %d is out of range", offset))
+	}
+
+	return offset
+}
+
 func Require(runtime *goja.Runtime, module *goja.Object) {
 	b := &Buffer{r: runtime}
 	uint8Array := runtime.Get("Uint8Array")
@@ -425,6 +609,24 @@ func Require(runtime *goja.Runtime, module *goja.Object) {
 	proto.DefineDataProperty("constructor", ctor, goja.FLAG_TRUE, goja.FLAG_TRUE, goja.FLAG_FALSE)
 	proto.Set("equals", b.proto_equals)
 	proto.Set("toString", b.proto_toString)
+	proto.Set("readBigInt64BE", b.readBigInt64BE)
+	proto.Set("readBigInt64LE", b.readBigInt64LE)
+	proto.Set("readBigUInt64BE", b.readBigUInt64BE)
+	proto.Set("readBigUInt64LE", b.readBigUInt64LE)
+	proto.Set("readDoubleBE", b.readDoubleBE)
+	proto.Set("readDoubleLE", b.readDoubleLE)
+	proto.Set("readFloatBE", b.readFloatBE)
+	proto.Set("readFloatLE", b.readFloatLE)
+	proto.Set("readInt8", b.readInt8)
+	proto.Set("readInt16BE", b.readInt16BE)
+	proto.Set("readInt16LE", b.readInt16LE)
+	proto.Set("readInt32BE", b.readInt32BE)
+	proto.Set("readInt32LE", b.readInt32LE)
+	proto.Set("readUInt8", b.readUInt8)
+	proto.Set("readUInt16BE", b.readUInt16BE)
+	proto.Set("readUInt16LE", b.readUInt16LE)
+	proto.Set("readUInt32BE", b.readUInt32BE)
+	proto.Set("readUInt32LE", b.readUInt32LE)
 
 	ctor.Set("prototype", proto)
 	ctor.Set("poolSize", 8192)
