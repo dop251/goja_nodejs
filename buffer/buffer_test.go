@@ -637,6 +637,150 @@ func TestBuffer_readInt32LE(t *testing.T) {
 	runTestCases(t, tcs)
 }
 
+func TestName(t *testing.T) {
+
+}
+
+func TestBuffer_readIntBE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "6 byte positive integer",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				if (b.readIntBE(0, 6) !== 20015998341291) {
+					throw new Error(b);
+				}
+			`,
+		},
+		{
+			name: "1 byte negative integer",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				if (b.readIntBE(4, 1) !== -112) {
+					throw new Error(b);
+				}
+			`,
+		},
+		{
+			name: "with no parameters",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				// this should error 
+				b.readIntBE();
+				throw new Error("should not get here");
+			`,
+			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "offset" argument is required`,
+		},
+		{
+			name: "type mismatch for offset",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				// this should error 
+				b.readIntBE("1");
+				throw new Error("should not get here");
+			`,
+			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "offset" argument must be of type number`,
+		},
+		{
+			name: "with no byteLength parameter",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				// this should error 
+				b.readIntBE(0);
+				throw new Error("should not get here");
+			`,
+			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "byteLength" argument is required`,
+		},
+		{
+			name: "byteLength less than 1",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				// this should error 
+				b.readIntBE(0,0);
+				throw new Error("should not get here");
+			`,
+			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "byteLength" 0 is out of range`,
+		},
+		{
+			name: "byteLength greater than 7",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				// this should error 
+				b.readIntBE(0,7);
+				throw new Error("should not get here");
+			`,
+			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "byteLength" 7 is out of range`,
+		},
+		{
+			name: "offset plus byteLength out of range",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				// this should error 
+				b.readIntBE(4,3);
+				throw new Error("should not get here");
+			`,
+			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 4 is out of range`,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_readIntLE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "6 byte negative integer",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				if (b.readIntLE(0, 6) !== -92837994154990) {
+					throw new Error(b);
+				}
+			`,
+		},
+		{
+			name: "1 byte positive integer",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				if (b.readIntLE(0, 1) !== 18) {
+					throw new Error(b);
+				}
+			`,
+		},
+		{
+			name: "with no parameters",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				// this should error 
+				b.readIntLE();
+				throw new Error("should not get here");
+			`,
+			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "offset" argument is required`,
+		},
+		{
+			name: "with no byteLength parameter",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				// this should error 
+				b.readIntLE(0);
+				throw new Error("should not get here");
+			`,
+			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "byteLength" argument is required`,
+		},
+		{
+			name: "offset plus byteLength out of range",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				// this should error 
+				b.readIntLE(4,3);
+				throw new Error("should not get here");
+			`,
+			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 4 is out of range`,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
 func TestBuffer_readUInt8(t *testing.T) {
 	tcs := []testCase{
 		{
@@ -804,6 +948,116 @@ func TestBuffer_readUInt32LE(t *testing.T) {
 				throw new Error("should not get here");// this should error
 			`,
 			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" -1 is out of range`,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_readUIntBE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "6 byte integer",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				if (b.readUIntBE(0, 6) !== 20015998341291) {
+					throw new Error(b);
+				}
+			`,
+		},
+		{
+			name: "1 byte integer",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				if (b.readUIntBE(1, 1) !== 52) {
+					throw new Error(b);
+				}
+			`,
+		},
+		{
+			name: "with no parameters",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				// this should error 
+				b.readUIntBE();
+				throw new Error("should not get here");
+			`,
+			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "offset" argument is required`,
+		},
+		{
+			name: "with no byteLength parameter",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				// this should error 
+				b.readUIntBE(0);
+				throw new Error("should not get here");
+			`,
+			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "byteLength" argument is required`,
+		},
+		{
+			name: "offset plus byteLength out of range",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				// this should error 
+				b.readUIntBE(4,3);
+				throw new Error("should not get here");
+			`,
+			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 4 is out of range`,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_readUIntLE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "6 byte integer",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				if (b.readUIntLE(0, 6) !== 188636982555666) {
+					throw new Error(b);
+				}
+			`,
+		},
+		{
+			name: "1 byte integer",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				if (b.readUIntLE(1, 1) !== 52) {
+					throw new Error(b);
+				}
+			`,
+		},
+		{
+			name: "with no parameters",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				// this should error 
+				b.readUIntLE();
+				throw new Error("should not get here");
+			`,
+			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "offset" argument is required`,
+		},
+		{
+			name: "with no byteLength parameter",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				// this should error 
+				b.readUIntLE(0);
+				throw new Error("should not get here");
+			`,
+			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "byteLength" argument is required`,
+		},
+		{
+			name: "offset plus byteLength out of range",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				// this should error 
+				b.readUIntLE(4,3);
+				throw new Error("should not get here");
+			`,
+			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 4 is out of range`,
 		},
 	}
 
