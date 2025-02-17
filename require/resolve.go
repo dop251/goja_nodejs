@@ -3,6 +3,8 @@ package require
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -32,15 +34,18 @@ func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
 	p := path.Join(start, modpath)
 	if isFileOrDirectoryPath(origPath) {
 		if module = r.modules[p]; module != nil {
+			moduleDebug(fmt.Sprintf("resolve %s (cached)", p))
 			return
 		}
 		module, err = r.loadAsFileOrDirectory(p)
 		if err == nil && module != nil {
+			moduleDebug(fmt.Sprintf("resolve %s (loaded)", p))
 			r.modules[p] = module
 		}
 	} else {
 		module, err = r.loadNative(origPath)
 		if err == nil {
+			moduleDebug(fmt.Sprintf("resolve %s (native)", origPath))
 			return
 		} else {
 			if err == InvalidModuleError {
@@ -232,8 +237,10 @@ func (r *RequireModule) loadModuleFile(path string, jsModule *js.Object) error {
 	prg, err := r.r.getCompiledSource(path)
 
 	if err != nil {
+		moduleDebug(fmt.Sprintf("resolve %s (not found)", path))
 		return err
 	}
+	moduleDebug(fmt.Sprintf("resolve %s (ok)", path))
 
 	f, err := r.runtime.RunProgram(prg)
 	if err != nil {
@@ -253,6 +260,7 @@ func (r *RequireModule) loadModuleFile(path string, jsModule *js.Object) error {
 			return err
 		}
 	} else {
+		moduleDebug(fmt.Sprintf("resolve %s (invalid)", path))
 		return InvalidModuleError
 	}
 
@@ -273,4 +281,10 @@ func isFileOrDirectoryPath(path string) bool {
 	}
 
 	return result
+}
+
+func moduleDebug(msg string) {
+	if os.Getenv("NODE_DEBUG") == "module" {
+		println(msg)
+	}
 }
