@@ -524,6 +524,36 @@ func (b *Buffer) readInt32LE(call goja.FunctionCall) goja.Value {
 	return b.r.ToValue(value)
 }
 
+// readIntBE reads a big-endian signed integer of variable byte length
+func (b *Buffer) readIntBE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset, byteLength := b.getVariableLengthReadArguments(call, bb)
+
+	var value int64
+	for i := int64(0); i < byteLength; i++ {
+		value = (value << 8) | int64(bb[offset+i])
+	}
+
+	value = signExtend(value, byteLength)
+
+	return b.r.ToValue(value)
+}
+
+// readIntLE reads a little-endian signed integer of variable byte length
+func (b *Buffer) readIntLE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset, byteLength := b.getVariableLengthReadArguments(call, bb)
+
+	var value int64
+	for i := byteLength - 1; i >= 0; i-- {
+		value = (value << 8) | int64(bb[offset+i])
+	}
+
+	value = signExtend(value, byteLength)
+
+	return b.r.ToValue(value)
+}
+
 // readUInt8 reads an 8-bit unsigned integer from the buffer
 func (b *Buffer) readUInt8(call goja.FunctionCall) goja.Value {
 	bb := Bytes(b.r, call.This)
@@ -569,6 +599,32 @@ func (b *Buffer) readUInt32LE(call goja.FunctionCall) goja.Value {
 	return b.r.ToValue(value)
 }
 
+// readUIntBE reads a big-endian unsigned integer of variable byte length
+func (b *Buffer) readUIntBE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset, byteLength := b.getVariableLengthReadArguments(call, bb)
+
+	var value uint64
+	for i := int64(0); i < byteLength; i++ {
+		value = (value << 8) | uint64(bb[offset+i])
+	}
+
+	return b.r.ToValue(value)
+}
+
+// readUIntLE reads a little-endian unsigned integer of variable byte length
+func (b *Buffer) readUIntLE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	offset, byteLength := b.getVariableLengthReadArguments(call, bb)
+
+	var value uint64
+	for i := byteLength - 1; i >= 0; i-- {
+		value = (value << 8) | uint64(bb[offset+i])
+	}
+
+	return b.r.ToValue(value)
+}
+
 func (b *Buffer) getOffsetArgument(call goja.FunctionCall, argIndex int, bb []byte, numBytes int64) int64 {
 	arg := call.Argument(argIndex)
 	var offset int64
@@ -578,14 +634,54 @@ func (b *Buffer) getOffsetArgument(call goja.FunctionCall, argIndex int, bb []by
 		// optional arg that defaults to zero
 		offset = 0
 	} else {
-		panic(errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The \"offset\" argument must be of type number."))
+		panic(b.newArgumentNotNumberTypeError("offset"))
 	}
 
 	if offset < 0 || offset+numBytes > int64(len(bb)) {
-		panic(errors.NewError(b.r, nil, errors.ErrCodedOutOfRange, "The value of \"offset\" %d is out of range", offset))
+		panic(b.newArgumentOutOfRangeError("offset", offset))
 	}
 
 	return offset
+}
+
+func (b *Buffer) getVariableLengthReadArguments(call goja.FunctionCall, bb []byte) (int64, int64) {
+	offset := b.getRequiredIntegerArgument(call, "offset", 0)
+	byteLength := b.getRequiredIntegerArgument(call, "byteLength", 1)
+
+	if byteLength < 1 || byteLength > 6 {
+		panic(b.newArgumentOutOfRangeError("byteLength", byteLength))
+	}
+	if offset < 0 || offset+byteLength > int64(len(bb)) {
+		panic(b.newArgumentOutOfRangeError("offset", offset))
+	}
+
+	return offset, byteLength
+}
+
+func signExtend(value int64, numBytes int64) int64 {
+	// we don't have to turn this to a uint64 first because numBytes < 8 so
+	// the sign bit will never pushed out of the int64 range
+	return (value << (64 - 8*numBytes)) >> (64 - 8*numBytes)
+}
+
+func (b *Buffer) getRequiredIntegerArgument(call goja.FunctionCall, name string, argIndex int) int64 {
+	arg := call.Argument(argIndex)
+	if isNumber(arg) {
+		return arg.ToInteger()
+	}
+	if goja.IsUndefined(arg) {
+		panic(errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The \"%s\" argument is required.", name))
+	}
+
+	panic(b.newArgumentNotNumberTypeError(name))
+}
+
+func (b *Buffer) newArgumentNotNumberTypeError(name string) *goja.Object {
+	return errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The \"%s\" argument must be of type number.", name)
+}
+
+func (b *Buffer) newArgumentOutOfRangeError(name string, v int64) *goja.Object {
+	return errors.NewRangeError(b.r, errors.ErrCodeOutOfRange, "The value of \"%s\" %d is out of range", name, v)
 }
 
 func Require(runtime *goja.Runtime, module *goja.Object) {
@@ -612,7 +708,13 @@ func Require(runtime *goja.Runtime, module *goja.Object) {
 	proto.Set("readBigInt64BE", b.readBigInt64BE)
 	proto.Set("readBigInt64LE", b.readBigInt64LE)
 	proto.Set("readBigUInt64BE", b.readBigUInt64BE)
+	// aliases for readBigUInt64BE
+	proto.Set("readBigUint64BE", b.readBigUInt64BE)
+
 	proto.Set("readBigUInt64LE", b.readBigUInt64LE)
+	// aliases for readBigUInt64LE
+	proto.Set("readBigUint64LE", b.readBigUInt64LE)
+
 	proto.Set("readDoubleBE", b.readDoubleBE)
 	proto.Set("readDoubleLE", b.readDoubleLE)
 	proto.Set("readFloatBE", b.readFloatBE)
@@ -622,11 +724,35 @@ func Require(runtime *goja.Runtime, module *goja.Object) {
 	proto.Set("readInt16LE", b.readInt16LE)
 	proto.Set("readInt32BE", b.readInt32BE)
 	proto.Set("readInt32LE", b.readInt32LE)
+	proto.Set("readIntBE", b.readIntBE)
+	proto.Set("readIntLE", b.readIntLE)
 	proto.Set("readUInt8", b.readUInt8)
+	// aliases for readUInt8
+	proto.Set("readUint8", b.readUInt8)
+
 	proto.Set("readUInt16BE", b.readUInt16BE)
+	// aliases for readUInt16BE
+	proto.Set("readUint16BE", b.readUInt16BE)
+
 	proto.Set("readUInt16LE", b.readUInt16LE)
+	// aliases for readUInt16LE
+	proto.Set("readUint16LE", b.readUInt16LE)
+
 	proto.Set("readUInt32BE", b.readUInt32BE)
+	// aliases for readUInt32BE
+	proto.Set("readUint32BE", b.readUInt32BE)
+
 	proto.Set("readUInt32LE", b.readUInt32LE)
+	// aliases for readUInt32LE
+	proto.Set("readUint32LE", b.readUInt32LE)
+
+	proto.Set("readUIntBE", b.readUIntBE)
+	// aliases for readUIntBE
+	proto.Set("readUintBE", b.readUIntBE)
+
+	proto.Set("readUIntLE", b.readUIntLE)
+	// aliases for readUIntLE
+	proto.Set("readUintLE", b.readUIntLE)
 
 	ctor.Set("prototype", proto)
 	ctor.Set("poolSize", 8192)
