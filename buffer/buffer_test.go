@@ -339,6 +339,15 @@ func TestBuffer_readBigUInt64BE(t *testing.T) {
 				}
 			`,
 		},
+		{
+			name: "use alias",
+			script: `
+				const b = Buffer.from([0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff]);
+				if (b.readBigUint64BE() !== BigInt(4294967295)) {
+					throw new Error(b);
+				}
+			`,
+		},
 	}
 
 	runTestCases(t, tcs)
@@ -364,6 +373,15 @@ func TestBuffer_readBigUInt64LE(t *testing.T) {
 				throw new Error("should not get here");
 			`,
 			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
+		},
+		{
+			name: "use alias",
+			script: `
+				const b = Buffer.from([0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff]);
+				if (b.readBigUint64LE(0) !== BigInt(18446744069414584320)) {
+					throw new Error(b);
+				}
+			`,
 		},
 	}
 
@@ -810,6 +828,15 @@ func TestBuffer_readUInt8(t *testing.T) {
 				}
 			`,
 		},
+		{
+			name: "use alias",
+			script: `
+				const b = Buffer.from([1, -2]);
+				if (b.readUint8() !== 1) {
+					throw new Error(b);
+				}
+			`,
+		},
 	}
 
 	runTestCases(t, tcs)
@@ -840,6 +867,15 @@ func TestBuffer_readUInt16BE(t *testing.T) {
 			script: `
 				const b = Buffer.from([0x12, 0x34, 0x56]);
 				if (b.readUInt16BE().toString(16) !== "1234") {
+					throw new Error(b);
+				}
+			`,
+		},
+		{
+			name: "use alias",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56]);
+				if (b.readUint16BE().toString(16) !== "1234") {
 					throw new Error(b);
 				}
 			`,
@@ -879,6 +915,15 @@ func TestBuffer_readUInt16LE(t *testing.T) {
 			`,
 			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 2 is out of range`,
 		},
+		{
+			name: "use alias",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56]);
+				if (b.readUint16LE(1).toString(16) !== "5634") {
+					throw new Error(b);
+				}
+			`,
+		},
 	}
 
 	runTestCases(t, tcs)
@@ -900,6 +945,15 @@ func TestBuffer_readUInt32BE(t *testing.T) {
 			script: `
 				const b = Buffer.from([0x12, 0x34, 0x56, 0x78]);
 				if (b.readUInt32BE().toString(16) !== "12345678") {
+					throw new Error(b);
+				}
+			`,
+		},
+		{
+			name: "use alias",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78]);
+				if (b.readUint32BE(0).toString(16) !== "12345678") {
 					throw new Error(b);
 				}
 			`,
@@ -948,6 +1002,15 @@ func TestBuffer_readUInt32LE(t *testing.T) {
 				throw new Error("should not get here");// this should error
 			`,
 			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" -1 is out of range`,
+		},
+		{
+			name: "use alias",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78]);
+				if (b.readUint32LE(0).toString(16) !== "78563412") {
+					throw new Error(b);
+				}
+			`,
 		},
 	}
 
@@ -1004,6 +1067,15 @@ func TestBuffer_readUIntBE(t *testing.T) {
 			`,
 			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 4 is out of range`,
 		},
+		{
+			name: "use alias",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				if (b.readUintBE(1, 1) !== 52) {
+					throw new Error(b);
+				}
+			`,
+		},
 	}
 
 	runTestCases(t, tcs)
@@ -1058,6 +1130,15 @@ func TestBuffer_readUIntLE(t *testing.T) {
 				throw new Error("should not get here");
 			`,
 			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 4 is out of range`,
+		},
+		{
+			name: "use alias",
+			script: `
+				const b = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x90, 0xab]);
+				if (b.readUintLE(1, 1) !== 52) {
+					throw new Error(b);
+				}
+			`,
 		},
 	}
 

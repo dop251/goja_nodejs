@@ -708,7 +708,13 @@ func Require(runtime *goja.Runtime, module *goja.Object) {
 	proto.Set("readBigInt64BE", b.readBigInt64BE)
 	proto.Set("readBigInt64LE", b.readBigInt64LE)
 	proto.Set("readBigUInt64BE", b.readBigUInt64BE)
+	// aliases for readBigUInt64BE
+	proto.Set("readBigUint64BE", b.readBigUInt64BE)
+
 	proto.Set("readBigUInt64LE", b.readBigUInt64LE)
+	// aliases for readBigUInt64LE
+	proto.Set("readBigUint64LE", b.readBigUInt64LE)
+
 	proto.Set("readDoubleBE", b.readDoubleBE)
 	proto.Set("readDoubleLE", b.readDoubleLE)
 	proto.Set("readFloatBE", b.readFloatBE)
@@ -721,12 +727,32 @@ func Require(runtime *goja.Runtime, module *goja.Object) {
 	proto.Set("readIntBE", b.readIntBE)
 	proto.Set("readIntLE", b.readIntLE)
 	proto.Set("readUInt8", b.readUInt8)
+	// aliases for readUInt8
+	proto.Set("readUint8", b.readUInt8)
+
 	proto.Set("readUInt16BE", b.readUInt16BE)
+	// aliases for readUInt16BE
+	proto.Set("readUint16BE", b.readUInt16BE)
+
 	proto.Set("readUInt16LE", b.readUInt16LE)
+	// aliases for readUInt16LE
+	proto.Set("readUint16LE", b.readUInt16LE)
+
 	proto.Set("readUInt32BE", b.readUInt32BE)
+	// aliases for readUInt32BE
+	proto.Set("readUint32BE", b.readUInt32BE)
+
 	proto.Set("readUInt32LE", b.readUInt32LE)
+	// aliases for readUInt32LE
+	proto.Set("readUint32LE", b.readUInt32LE)
+
 	proto.Set("readUIntBE", b.readUIntBE)
+	// aliases for readUIntBE
+	proto.Set("readUintBE", b.readUIntBE)
+
 	proto.Set("readUIntLE", b.readUIntLE)
+	// aliases for readUIntLE
+	proto.Set("readUintLE", b.readUIntLE)
 
 	ctor.Set("prototype", proto)
 	ctor.Set("poolSize", 8192)
