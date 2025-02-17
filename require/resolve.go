@@ -3,6 +3,8 @@ package require
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -12,6 +14,26 @@ import (
 )
 
 const NodePrefix = "node:"
+
+func parseNodeDebug() (string, []string) {
+	debug := os.Getenv("NODE_DEBUG")
+	if debug == "" {
+		return "", nil
+	}
+	parts := strings.Split(debug, ",")
+	for i, p := range parts {
+		parts[i] = strings.TrimSpace(p)
+	}
+	debugMode := parts[0]
+	var params []string
+	if len(parts) > 1 {
+		params = parts[1:]
+	}
+	return debugMode, params
+}
+
+var nodeDebugMode, nodeDebugParams = parseNodeDebug()
+var moduleDebugEnabled = nodeDebugMode == "module"
 
 // NodeJS module search algorithm described by
 // https://nodejs.org/api/modules.html#modules_all_together
@@ -32,15 +54,18 @@ func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
 	p := path.Join(start, modpath)
 	if isFileOrDirectoryPath(origPath) {
 		if module = r.modules[p]; module != nil {
+			moduleDebug(p, "cached")
 			return
 		}
 		module, err = r.loadAsFileOrDirectory(p)
 		if err == nil && module != nil {
+			moduleDebug(p, "loaded")
 			r.modules[p] = module
 		}
 	} else {
 		module, err = r.loadNative(origPath)
 		if err == nil {
+			moduleDebug(origPath, "native")
 			return
 		} else {
 			if err == InvalidModuleError {
@@ -59,6 +84,7 @@ func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
 	}
 
 	if module == nil && err == nil {
+		moduleDebug(modpath, "fatal")
 		err = InvalidModuleError
 	}
 	return
@@ -232,8 +258,10 @@ func (r *RequireModule) loadModuleFile(path string, jsModule *js.Object) error {
 	prg, err := r.r.getCompiledSource(path)
 
 	if err != nil {
+		moduleDebug(path, "not found")
 		return err
 	}
+	moduleDebug(path, "ok")
 
 	f, err := r.runtime.RunProgram(prg)
 	if err != nil {
@@ -253,6 +281,7 @@ func (r *RequireModule) loadModuleFile(path string, jsModule *js.Object) error {
 			return err
 		}
 	} else {
+		moduleDebug(path, "invalid")
 		return InvalidModuleError
 	}
 
@@ -273,4 +302,25 @@ func isFileOrDirectoryPath(path string) bool {
 	}
 
 	return result
+}
+
+func moduleDebug(modPath string, result string) {
+	if moduleDebugEnabled {
+		moduleName := modPath
+		if ext := path.Ext(modPath); ext != "" {
+			moduleName = path.Base(path.Dir(modPath))
+		} else {
+			moduleName = path.Base(modPath)
+		}
+		shouldOutput := len(nodeDebugParams) == 0
+		for _, param := range nodeDebugParams {
+			if param == moduleName {
+				shouldOutput = true
+				break
+			}
+		}
+		if shouldOutput {
+			println(fmt.Sprintf("resolve %s (%s)", modPath, result))
+		}
+	}
 }
