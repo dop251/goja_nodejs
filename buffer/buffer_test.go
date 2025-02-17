@@ -312,7 +312,7 @@ func TestBuffer_readBigInt64LE(t *testing.T) {
 				b.readBigInt64LE(1);
 				throw new Error("should not get here");
 			`,
-			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
 		},
 	}
 
@@ -363,7 +363,7 @@ func TestBuffer_readBigUInt64LE(t *testing.T) {
 				b.readBigUInt64LE(1);
 				throw new Error("should not get here");
 			`,
-			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
 		},
 	}
 
@@ -414,7 +414,7 @@ func TestBuffer_readDoubleLE(t *testing.T) {
 				b.readDoubleLE(1);
 				throw new Error("should not get here");
 			`,
-			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
 		},
 	}
 
@@ -465,7 +465,7 @@ func TestBuffer_readFloatLE(t *testing.T) {
 				b.readFloatLE(1);
 				throw new Error("should not get here");
 			`,
-			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
 		},
 	}
 
@@ -525,7 +525,7 @@ func TestBuffer_readInt16BE(t *testing.T) {
 				b.readInt16BE(1);
 				throw new Error("should not get here");
 			`,
-			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
 		},
 		{
 			name: "with no/default offset",
@@ -560,7 +560,7 @@ func TestBuffer_readInt16LE(t *testing.T) {
 				b.readInt16LE(1);
 				throw new Error("should not get here");
 			`,
-			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
 		},
 	}
 
@@ -586,7 +586,7 @@ func TestBuffer_readInt32BE(t *testing.T) {
 				b.readInt32BE(1);
 				throw new Error("should not get here");
 			`,
-			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
 		},
 		{
 			name: "with no/default offset",
@@ -621,7 +621,7 @@ func TestBuffer_readInt32LE(t *testing.T) {
 				b.readInt32LE(1);
 				throw new Error("should not get here");
 			`,
-			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
 		},
 		{
 			name: "with no/default offset",
@@ -699,7 +699,7 @@ func TestBuffer_readIntBE(t *testing.T) {
 				b.readIntBE(0,0);
 				throw new Error("should not get here");
 			`,
-			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "byteLength" 0 is out of range`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "byteLength" 0 is out of range`,
 		},
 		{
 			name: "byteLength greater than 7",
@@ -709,7 +709,7 @@ func TestBuffer_readIntBE(t *testing.T) {
 				b.readIntBE(0,7);
 				throw new Error("should not get here");
 			`,
-			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "byteLength" 7 is out of range`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "byteLength" 7 is out of range`,
 		},
 		{
 			name: "offset plus byteLength out of range",
@@ -719,7 +719,7 @@ func TestBuffer_readIntBE(t *testing.T) {
 				b.readIntBE(4,3);
 				throw new Error("should not get here");
 			`,
-			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 4 is out of range`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 4 is out of range`,
 		},
 	}
 
@@ -774,7 +774,7 @@ func TestBuffer_readIntLE(t *testing.T) {
 				b.readIntLE(4,3);
 				throw new Error("should not get here");
 			`,
-			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 4 is out of range`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 4 is out of range`,
 		},
 	}
 
@@ -877,7 +877,7 @@ func TestBuffer_readUInt16LE(t *testing.T) {
 				b.readUInt16LE(2);	
 				throw new Error("should not get here");
 			`,
-			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 2 is out of range`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 2 is out of range`,
 		},
 	}
 
@@ -947,7 +947,7 @@ func TestBuffer_readUInt32LE(t *testing.T) {
 				b.readUInt32LE(-1);
 				throw new Error("should not get here");// this should error
 			`,
-			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" -1 is out of range`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" -1 is out of range`,
 		},
 	}
 
@@ -1002,7 +1002,7 @@ func TestBuffer_readUIntBE(t *testing.T) {
 				b.readUIntBE(4,3);
 				throw new Error("should not get here");
 			`,
-			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 4 is out of range`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 4 is out of range`,
 		},
 	}
 
@@ -1057,7 +1057,7 @@ func TestBuffer_readUIntLE(t *testing.T) {
 				b.readUIntLE(4,3);
 				throw new Error("should not get here");
 			`,
-			expectedErr: `Error [ERR_OUT_OF_RANGE]: The value of "offset" 4 is out of range`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 4 is out of range`,
 		},
 	}
 

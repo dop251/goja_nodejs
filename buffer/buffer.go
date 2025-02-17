@@ -681,7 +681,7 @@ func (b *Buffer) newArgumentNotNumberTypeError(name string) *goja.Object {
 }
 
 func (b *Buffer) newArgumentOutOfRangeError(name string, v int64) *goja.Object {
-	return errors.NewError(b.r, nil, errors.ErrCodedOutOfRange, "The value of \"%s\" %d is out of range", name, v)
+	return errors.NewRangeError(b.r, errors.ErrCodeOutOfRange, "The value of \"%s\" %d is out of range", name, v)
 }
 
 func Require(runtime *goja.Runtime, module *goja.Object) {
