@@ -64,6 +64,7 @@ func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
 	}
 
 	if module == nil && err == nil {
+		moduleDebug(fmt.Sprintf("resolve %s (fatal)", modpath))
 		err = InvalidModuleError
 	}
 	return
