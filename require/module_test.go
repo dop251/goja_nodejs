@@ -365,6 +365,7 @@ func TestResolve(t *testing.T) {
 		"/node_modules/b/file.js":                `exports.name = "app13"`,
 		"node_modules/app14/index.js":            `exports.name = "app14"`,
 		"../node_modules/app15/index.js":         `exports.name = "app15"`,
+		"/home/src/node_modules/app16/index.js":  `exports.name = "app16"`,
 	}
 
 	for i, tc := range []struct {
@@ -396,6 +397,8 @@ func TestResolve(t *testing.T) {
 		{"/", "./app13/app13", true, "name", "app13"},
 		{".", "app14", true, "name", "app14"},
 		{"..", "nonexistent", false, "", ""},
+		{"", "app16", true, "name", "app16"},                     // Fails
+		{"/home/src/packages/a", "app16", true, "name", "app16"}, // passes
 	} {
 		vm, mod, err := testRequire(tc.src, tc.path, globalFolders, fs)
 		if err != nil {
