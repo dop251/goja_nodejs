@@ -148,6 +148,7 @@ func (b *Buffer) ctor(call goja.ConstructorCall) (res *goja.Object) {
 type StringCodec interface {
 	DecodeAppend(string, []byte) []byte
 	Encode([]byte) string
+	Decode(s string) []byte
 }
 
 type hexCodec struct{}
@@ -162,19 +163,27 @@ func (hexCodec) DecodeAppend(s string, b []byte) []byte {
 	return res
 }
 
+func (hexCodec) Decode(s string) []byte {
+	n, _ := hex.DecodeString(s)
+	return n
+}
 func (hexCodec) Encode(b []byte) string {
 	return hex.EncodeToString(b)
 }
 
 type _utf8Codec struct{}
 
-func (_utf8Codec) DecodeAppend(s string, b []byte) []byte {
-	r, _ := unicode.UTF8.NewEncoder().String(s)
+func (c _utf8Codec) DecodeAppend(s string, b []byte) []byte {
+	r := c.Decode(s)
 	dst, res := expandSlice(b, len(r))
 	copy(dst, r)
 	return res
 }
 
+func (_utf8Codec) Decode(s string) []byte {
+	r, _ := unicode.UTF8.NewEncoder().String(s)
+	return []byte(r)
+}
 func (_utf8Codec) Encode(b []byte) string {
 	r, _ := unicode.UTF8.NewDecoder().Bytes(b)
 	return string(r)
@@ -191,6 +200,10 @@ func (base64Codec) DecodeAppend(s string, b []byte) []byte {
 	return res
 }
 
+func (base64Codec) Decode(s string) []byte {
+	res, _ := base64.StdEncoding.DecodeString(s)
+	return res
+}
 func (base64Codec) Encode(b []byte) string {
 	return base64.StdEncoding.EncodeToString(b)
 }
@@ -363,7 +376,7 @@ func (b *Buffer) alloc(call goja.FunctionCall) goja.Value {
 		size = int(arg0.ToInteger())
 	}
 	if size < 0 {
-		panic(errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The \"size\" argument must be of type number."))
+		panic(b.newArgumentNotNumberTypeError("size"))
 	}
 	fill := call.Argument(1)
 	buf := make([]byte, size)
@@ -394,7 +407,27 @@ func (b *Buffer) alloc(call goja.FunctionCall) goja.Value {
 func (b *Buffer) proto_toString(call goja.FunctionCall) goja.Value {
 	bb := Bytes(b.r, call.This)
 	codec := b.getStringCodec(call.Argument(0))
-	return b.r.ToValue(codec.Encode(bb))
+	start := b.getCoercedIntegerArgument(call, 1, 0, 0)
+
+	// Node's Buffer class makes this zero if it is negative
+	if start < 0 {
+		start = 0
+	} else if start >= int64(len(bb)) {
+		// returns an empty string if start is beyond the length of the buffer
+		return b.r.ToValue("")
+	}
+
+	// NOTE that Node will default to the length of the buffer, but uses 0 for type mismatch defaults
+	end := b.getCoercedIntegerArgument(call, 2, int64(len(bb)), 0)
+	if end < 0 || start >= end {
+		// returns an empty string if end < 0 or start >= end
+		return b.r.ToValue("")
+	} else if end > int64(len(bb)) {
+		// and Node ensures you don't go past the Buffer
+		end = int64(len(bb))
+	}
+
+	return b.r.ToValue(codec.Encode(bb[start:end]))
 }
 
 func (b *Buffer) proto_equals(call goja.FunctionCall) goja.Value {
@@ -625,17 +658,32 @@ func (b *Buffer) readUIntLE(call goja.FunctionCall) goja.Value {
 	return b.r.ToValue(value)
 }
 
-func (b *Buffer) getOffsetArgument(call goja.FunctionCall, argIndex int, bb []byte, numBytes int64) int64 {
-	arg := call.Argument(argIndex)
-	var offset int64
-	if isNumber(arg) {
-		offset = arg.ToInteger()
-	} else if goja.IsUndefined(arg) {
-		// optional arg that defaults to zero
-		offset = 0
-	} else {
-		panic(b.newArgumentNotNumberTypeError("offset"))
+// write will write a string to the Buffer at offset according to the character encoding. The length parameter is
+// the number of bytes to write. If buffer did not contain enough space to fit the entire string, only part of string
+// will be written.
+func (b *Buffer) write(call goja.FunctionCall) goja.Value {
+	if len(call.Arguments) < 1 || !isString(call.Argument(0)) {
+		panic(errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "argument must be a string"))
 	}
+	bb := Bytes(b.r, call.This)
+	// note that we are passing in zero for numBytes, since the length parameter, which depends on offset,
+	// will dictate the number of bytes
+	offset := b.getOffsetArgument(call, 1, bb, 0)
+	// the length defaults to the size of the buffer - offset
+	maxLength := int64(len(bb)) - offset
+	length := b.getOptionalIntegerArgument(call, "length", 2, maxLength)
+	codec := b.getStringCodec(call.Argument(3))
+
+	raw := codec.Decode(call.Argument(0).String())
+	if int64(len(raw)) < length {
+		// make sure we only write up to raw bytes
+		length = int64(len(raw))
+	}
+	n := copy(bb[offset:], raw[:length])
+	return b.r.ToValue(n)
+}
+func (b *Buffer) getOffsetArgument(call goja.FunctionCall, argIndex int, bb []byte, numBytes int64) int64 {
+	offset := b.getOptionalIntegerArgument(call, "offset", argIndex, 0)
 
 	if offset < 0 || offset+numBytes > int64(len(bb)) {
 		panic(b.newArgumentOutOfRangeError("offset", offset))
@@ -676,8 +724,52 @@ func (b *Buffer) getRequiredIntegerArgument(call goja.FunctionCall, name string,
 	panic(b.newArgumentNotNumberTypeError(name))
 }
 
+func (b *Buffer) getCoercedIntegerArgument(call goja.FunctionCall, argIndex int, defaultValue int64, typeMistMatchValue int64) int64 {
+	arg := call.Argument(argIndex)
+	if isNumber(arg) {
+		return arg.ToInteger()
+	}
+	if goja.IsUndefined(arg) {
+		return defaultValue
+	}
+
+	return typeMistMatchValue
+}
+
+func (b *Buffer) getOptionalIntegerArgument(call goja.FunctionCall, name string, argIndex int, defaultValue int64) int64 {
+	arg := call.Argument(argIndex)
+	if isNumber(arg) {
+		return arg.ToInteger()
+	}
+	if goja.IsUndefined(arg) {
+		return defaultValue
+	}
+
+	panic(b.newArgumentNotNumberTypeError(name))
+}
+
+func (b *Buffer) getOptionalStringArgument(call goja.FunctionCall, name string, argIndex int, defaultValue string) string {
+	arg := call.Argument(argIndex)
+	if isString(arg) {
+		return arg.String()
+	}
+	if goja.IsUndefined(arg) {
+		return defaultValue
+	}
+
+	panic(b.newArgumentNotStringTypeError(name))
+}
+
+func (b *Buffer) newArgumentNotStringTypeError(name string) *goja.Object {
+	return b.newNotCorrectTypeError(name, "string")
+}
+
 func (b *Buffer) newArgumentNotNumberTypeError(name string) *goja.Object {
-	return errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The \"%s\" argument must be of type number.", name)
+	return b.newNotCorrectTypeError(name, "number")
+}
+
+func (b *Buffer) newNotCorrectTypeError(name, _type string) *goja.Object {
+	return errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The \"%s\" argument must be of type %s.", name, _type)
 }
 
 func (b *Buffer) newArgumentOutOfRangeError(name string, v int64) *goja.Object {
@@ -753,6 +845,7 @@ func Require(runtime *goja.Runtime, module *goja.Object) {
 	proto.Set("readUIntLE", b.readUIntLE)
 	// aliases for readUIntLE
 	proto.Set("readUintLE", b.readUIntLE)
+	proto.Set("write", b.write)
 
 	ctor.Set("prototype", proto)
 	ctor.Set("poolSize", 8192)
