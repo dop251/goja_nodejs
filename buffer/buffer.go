@@ -662,10 +662,8 @@ func (b *Buffer) readUIntLE(call goja.FunctionCall) goja.Value {
 // the number of bytes to write. If buffer did not contain enough space to fit the entire string, only part of string
 // will be written.
 func (b *Buffer) write(call goja.FunctionCall) goja.Value {
-	if len(call.Arguments) < 1 || !isString(call.Argument(0)) {
-		panic(errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "argument must be a string"))
-	}
 	bb := Bytes(b.r, call.This)
+	str := b.getRequiredStringArgument(call, "string", 0)
 	// note that we are passing in zero for numBytes, since the length parameter, which depends on offset,
 	// will dictate the number of bytes
 	offset := b.getOffsetArgument(call, 1, bb, 0)
@@ -674,7 +672,7 @@ func (b *Buffer) write(call goja.FunctionCall) goja.Value {
 	length := b.getOptionalIntegerArgument(call, "length", 2, maxLength)
 	codec := b.getStringCodec(call.Argument(3))
 
-	raw := codec.Decode(call.Argument(0).String())
+	raw := codec.Decode(str)
 	if int64(len(raw)) < length {
 		// make sure we only write up to raw bytes
 		length = int64(len(raw))
@@ -748,13 +746,13 @@ func (b *Buffer) getOptionalIntegerArgument(call goja.FunctionCall, name string,
 	panic(b.newArgumentNotNumberTypeError(name))
 }
 
-func (b *Buffer) getOptionalStringArgument(call goja.FunctionCall, name string, argIndex int, defaultValue string) string {
+func (b *Buffer) getRequiredStringArgument(call goja.FunctionCall, name string, argIndex int) string {
 	arg := call.Argument(argIndex)
 	if isString(arg) {
 		return arg.String()
 	}
 	if goja.IsUndefined(arg) {
-		return defaultValue
+		panic(errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The \"%s\" argument is required.", name))
 	}
 
 	panic(b.newArgumentNotStringTypeError(name))

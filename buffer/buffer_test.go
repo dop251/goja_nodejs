@@ -1455,7 +1455,7 @@ func TestBuffer_write(t *testing.T) {
 				buf.write();
 				throw new Error("should not get here");
 			`,
-			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: argument must be a string`,
+			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "string" argument is required`,
 		},
 		{
 			name: "argument not string type",
@@ -1465,7 +1465,7 @@ func TestBuffer_write(t *testing.T) {
 				buf.write(1);
 				throw new Error("should not get here");
 			`,
-			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: argument must be a string`,
+			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "string" argument must be of type string`,
 		},
 	}
 
