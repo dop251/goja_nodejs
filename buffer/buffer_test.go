@@ -1144,3 +1144,330 @@ func TestBuffer_readUIntLE(t *testing.T) {
 
 	runTestCases(t, tcs)
 }
+
+func TestBuffer_toString(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "with no parameters",
+			script: `
+				const buf = Buffer.alloc(5);
+  				buf.write('hello');
+
+				if (buf.toString() !== 'hello') {
+					throw new Error('should return "hello"');
+				}
+			`,
+		},
+		{
+			name: "utf8 encoding",
+			script: `
+				const buf = Buffer.from([0x7E]);
+				if (buf.toString('utf8') !== '~') {
+					throw new Error('should return "~"');
+				}
+			`,
+		},
+		{
+			name: "with valid start and valid end",
+			script: `
+				const buf = Buffer.alloc(10);
+				buf.write('hello world');
+
+				if (buf.toString('utf8', 6, 10) !== 'worl') {
+					throw new Error('should return "worl"');
+				}
+			`,
+		},
+		{
+			name: "with start=0 and end=0",
+			script: `
+				const buf = Buffer.alloc(10);
+				buf.write('hello world');
+
+				if (buf.toString('utf8', 0, 0) !== '') {
+					throw new Error('should return empty');
+				}
+			`,
+		},
+		{
+			name: "with start > end",
+			script: `
+				const buf = Buffer.alloc(10);
+				buf.write('hello world');
+
+				if (buf.toString('utf8', 3, 2) !== '') {
+					throw new Error('should return empty');
+				}
+			`,
+		},
+		{
+			name: "with start < 0",
+			script: `
+				const buf = Buffer.alloc(10);
+				buf.write('hello world');
+
+				if (buf.toString('utf8', -1, 2) !== 'he') {
+					throw new Error('should return "he"');
+				}
+			`,
+		},
+		{
+			name: "with start > buffer length",
+			script: `
+				const buf = Buffer.alloc(10);
+				buf.write('hello world');
+
+				if (buf.toString('utf8', 100, 2) !== '') {
+					throw new Error('should return empty');
+				}
+			`,
+		},
+		{
+			name: "with end > buffer length",
+			script: `
+				const buf = Buffer.alloc(10);
+				buf.write('hello world');
+
+				if (buf.toString('utf8', 1, 100) !== 'ello worl') {
+					throw new Error('should return "ello worl"');
+				}
+			`,
+		},
+		{
+			name: "with start == buffer length",
+			script: `
+				const buf = Buffer.alloc(10);
+				buf.write('hello world');
+
+				if (buf.toString('utf8', 10, 2) !== '') {
+					throw new Error('should return empty');
+				}
+			`,
+		},
+		{
+			name: "with non-numeric start",
+			script: `
+				const buf = Buffer.alloc(10);
+				buf.write('hello world');
+
+				if (buf.toString('utf8', {}, 2) !== 'he') {
+					throw new Error('should return "he"');
+				}
+			`,
+		},
+		{
+			name: "with float start",
+			script: `
+				const buf = Buffer.alloc(10);
+				buf.write('hello world');
+
+				if (buf.toString('utf8', 3.5, 10) !== 'lo worl') {
+					throw new Error('should return "lo worl"');
+				}
+			`,
+		},
+		{
+			name: "with float end",
+			script: `
+				const buf = Buffer.alloc(10);
+				buf.write('hello world');
+
+				if (buf.toString('utf8', 0, 4.9) !== 'hell') {
+					throw new Error('should return "hell"');
+				}
+			`,
+		},
+		{
+			name: "with multi-byte character",
+			script: `
+				const buf = Buffer.from([0xE2, 0x82, 0xAC]);
+				
+				if (buf.toString('utf8') !== '€') {
+					throw new Error('should return "€"');
+				}
+			`,
+		},
+		{
+			name: "with partitial multi-byte character",
+			script: `
+				const buf = Buffer.from([0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC]);
+				
+				if (buf.toString('utf8',0, 4) !== '€�') {
+					throw new Error('should return "€�"');
+				}
+			`,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_write(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write string with defaults",
+			script: `
+				const buf = Buffer.alloc(10);
+				const bytesWritten = buf.write('hello');
+
+				if (bytesWritten !== 5) {
+					throw new Error('bytesWritten should be 5');
+
+  				} else if (buf.toString('utf8', 0, 5) !== 'hello') {
+					throw new Error('buffer content should be "hello"');
+
+  				} else if (buf.toString('utf8', 5, 10) !== '\0\0\0\0\0') {
+					throw new Error('remaining buffer should be zeros');
+  				} 
+			`,
+		},
+		{
+			name: "write at offset",
+			script: `
+				const buf = Buffer.alloc(10);
+				const bytesWritten = buf.write('world', 5);
+
+				if (bytesWritten !== 5) {
+					throw new Error('bytesWritten should be 5');
+
+  				} else if (buf.toString('utf8', 5, 10) !== 'world') {
+					throw new Error('buffer content should be "world"');
+
+  				} else if (buf.toString('utf8', 0, 5) !== '\0\0\0\0\0') {
+					throw new Error('first 5 bytes should be zeros');
+  				} 
+			`,
+		},
+		{
+			name: "write with offset and length",
+			script: `
+				const buf = Buffer.alloc(10);
+				const bytesWritten = buf.write('hello world', 0, 5);
+
+				if (bytesWritten !== 5) {
+					throw new Error('bytesWritten should be 5');
+
+  				} else if (buf.toString('utf8', 0, 5) !== 'hello') {
+					throw new Error('buffer content should be "hello"');
+
+  				} else if (buf.toString('utf8', 5, 10) !== '\0\0\0\0\0') {
+					throw new Error('remaining buffer should be zeros');
+  				} 
+			`,
+		},
+		{
+			name: "write at offset zero",
+			script: `
+				const buf = Buffer.alloc(5);
+				const bytesWritten = buf.write('abc', 0);
+
+				if (bytesWritten !== 3) {
+					throw new Error('bytesWritten should be 3');
+
+  				} else if (buf.toString('utf8', 0, 3) !== 'abc') {
+					throw new Error('buffer content should be "abc"');
+  				} 
+			`,
+		},
+		{
+			name: "write at last offset",
+			script: `
+				const buf = Buffer.alloc(5);
+				const bytesWritten = buf.write('a', 4);
+
+				if (bytesWritten !== 1) {
+					throw new Error('bytesWritten should be 3');
+
+  				} else if (buf[4] !== 'a'.charCodeAt(0)) {
+					throw new Error('buf[4] should be "a"');
+  				} 
+			`,
+		},
+		{
+			name: "write with length zero",
+			script: `
+				const buf = Buffer.alloc(5);
+				const bytesWritten = buf.write('abc', 0, 0);
+
+				if (bytesWritten !== 0) {
+					throw new Error('bytesWritten should be 0');
+
+  				} else if (buf.toString('utf8', 0, 5) !== '\0\0\0\0\0') {
+					throw new Error('buffer should remain zeros');
+  				} 
+			`,
+		},
+		{
+			name: "write with length greater than string length",
+			script: `
+				const buf = Buffer.alloc(5);
+				const bytesWritten = buf.write('abc', 0, 5);
+
+				if (bytesWritten !== 3) {
+					throw new Error('bytesWritten should be 3');
+
+  				} else if (buf.toString('utf8', 0, 3) !== 'abc') {
+					throw new Error('buffer content should be "abc"');
+  				} 
+			`,
+		},
+		{
+			name: "write with offset + length exceeding buffer length",
+			script: `
+				const buf = Buffer.alloc(5);
+				const bytesWritten = buf.write('abcde', 3);
+
+				if (bytesWritten !== 2) {
+					throw new Error('bytesWritten should be 2');
+
+  				} else if (buf.toString('utf8', 3, 5) !== 'ab') {
+					throw new Error('buffer content at 3-5 should be "ab"');
+  				} 
+			`,
+		},
+		{
+			name: "invalid encoding",
+			script: `
+				const buf = Buffer.alloc(5);
+
+				// this should error
+				buf.write('a', 0, 1, 'invalid');
+				throw new Error("should not get here");
+			`,
+			expectedErr: `TypeError [ERR_UNKNOWN_ENCODING]: Unknown encoding: invalid`,
+		},
+		{
+			name: "offset out of range",
+			script: `
+				const buf = Buffer.alloc(5);
+
+				// this should error
+				buf.write('abc', 10);
+				throw new Error("should not get here");
+			`,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 10 is out of range`,
+		},
+		{
+			name: "with no parameters",
+			script: `
+				const buf = Buffer.alloc(5);
+				// this should error 
+				buf.write();
+				throw new Error("should not get here");
+			`,
+			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "string" argument is required`,
+		},
+		{
+			name: "argument not string type",
+			script: `
+				const buf = Buffer.alloc(5);
+				// this should error 
+				buf.write(1);
+				throw new Error("should not get here");
+			`,
+			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "string" argument must be of type string`,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
