@@ -1471,3 +1471,410 @@ func TestBuffer_write(t *testing.T) {
 
 	runTestCases(t, tcs)
 }
+
+func TestBuffer_writeBigInt64BE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with default offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				const bytesWritten = buf.writeBigInt64BE(BigInt(123456789));
+				
+				if (bytesWritten !== 8) {
+					throw new Error('bytesWritten should be 8');
+				}
+				
+				const value = buf.readBigInt64BE(0);
+				if (value !== BigInt(123456789)) {
+					throw new Error('should read back the written value, got: ' + value);
+				}
+            `,
+		},
+		{
+			name: "write negative number, zero offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				buf.writeBigInt64BE(BigInt(-123456789), 0);
+				
+				const value = buf.readBigInt64BE(0);
+				if (value !== BigInt(-123456789)) {
+					throw new Error('should read back the written negative value, got: ' + value);
+				}
+            `,
+		},
+		{
+			name: "write at non-zero offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				const bytesWritten = buf.writeBigInt64BE(BigInt(123456789), 4);
+				
+				if (bytesWritten !== 12) {
+					throw new Error('bytesWritten should be offset + bytes written (12)');
+				}
+				
+				const value = buf.readBigInt64BE(4);
+				if (value !== BigInt(123456789)) {
+					throw new Error('should read back the written value at offset, got: ' + value);
+				}
+            `,
+		},
+		{
+			name: "write with max int64 value",
+			script: `
+				const buf = Buffer.alloc(16);
+				const maxInt64 = BigInt("9223372036854775807"); // 2^63 - 1
+				buf.writeBigInt64BE(maxInt64);
+				
+				const value = buf.readBigInt64BE(0);
+				if (value !== maxInt64) {
+					throw new Error('should read back max int64 value, got: ' + value);
+				}
+            `,
+		},
+		{
+			name: "write with min int64 value",
+			script: `
+				const buf = Buffer.alloc(16);
+				const minInt64 = BigInt("-9223372036854775808"); // -2^63
+				buf.writeBigInt64BE(minInt64);
+				
+				const value = buf.readBigInt64BE(0);
+				if (value !== minInt64) {
+					throw new Error('should read back min int64 value, got: ' + value);
+				}
+            `,
+		},
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(8);
+				// this should error 
+				buf.writeBigInt64BE(BigInt(1), 1);
+				throw new Error("should not get here"); 
+            `,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
+		},
+		{
+			name: "write with negative offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				// this should error 
+				buf.writeBigInt64BE(BigInt(1), -1);
+				throw new Error("should not get here"); 
+            `,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" -1 is out of range`,
+		},
+		{
+			name: "write without required value",
+			script: `
+				const buf = Buffer.alloc(16);
+				// this should error 
+				buf.writeBigInt64BE();
+				throw new Error("should not get here"); 
+            `,
+			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "value" argument is required`,
+		},
+		{
+			name: "write with number instead of BigInt",
+			script: `
+				const buf = Buffer.alloc(16);
+				// this should error 
+				const bytesWritten = buf.writeBigInt64BE(123456789, 0);
+				throw new Error("should not get here"); 
+            `,
+			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "value" argument must be of type BigInt`,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(24);
+				buf.writeBigInt64BE(BigInt(123));
+				buf.writeBigInt64BE(BigInt(456), 8);
+				buf.writeBigInt64BE(BigInt(789), 16);
+				
+				if (buf.readBigInt64BE(0) !== BigInt(123)) {
+					throw new Error('first value incorrect');
+				}
+				if (buf.readBigInt64BE(8) !== BigInt(456)) {
+					throw new Error('second value incorrect');
+				}
+				if (buf.readBigInt64BE(16) !== BigInt(789)) {
+					throw new Error('third value incorrect');
+				}
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeBigInt64LE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with default offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				const bytesWritten = buf.writeBigInt64LE(BigInt(123456789));
+				
+				if (bytesWritten !== 8) {
+					throw new Error('bytesWritten should be 8');
+				}
+				
+				const value = buf.readBigInt64LE(0);
+				if (value !== BigInt(123456789)) {
+					throw new Error('should read back the written value, got: ' + value);
+				}
+            `,
+		},
+		{
+			name: "write negative number, zero offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				buf.writeBigInt64LE(BigInt(-123456789), 0);
+				
+				const value = buf.readBigInt64LE(0);
+				if (value !== BigInt(-123456789)) {
+					throw new Error('should read back the written negative value, got: ' + value);
+				}
+            `,
+		},
+		{
+			name: "write at non-zero offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				const bytesWritten = buf.writeBigInt64LE(BigInt(123456789), 4);
+				
+				if (bytesWritten !== 12) {
+					throw new Error('bytesWritten should be offset + bytes written (12)');
+				}
+				
+				const value = buf.readBigInt64LE(4);
+				if (value !== BigInt(123456789)) {
+					throw new Error('should read back the written value at offset, got: ' + value);
+				}
+            `,
+		},
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(8);
+				buf.writeBigInt64LE(BigInt(1), 1);
+				throw new Error("should not get here");  
+            `,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(24);
+				buf.writeBigInt64LE(BigInt(123));
+				buf.writeBigInt64LE(BigInt(456), 8);
+				buf.writeBigInt64LE(BigInt(789), 16);
+				
+				if (buf.readBigInt64LE(0) !== BigInt(123)) {
+					throw new Error('first value incorrect');
+				}
+				if (buf.readBigInt64LE(8) !== BigInt(456)) {
+					throw new Error('second value incorrect');
+				}
+				if (buf.readBigInt64LE(16) !== BigInt(789)) {
+					throw new Error('third value incorrect');
+				}
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeBigUInt64BE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with default offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				const bytesWritten = buf.writeBigUInt64BE(BigInt(123456789));
+				
+				if (bytesWritten !== 8) {
+					throw new Error('bytesWritten should be 8');
+				}
+				
+				const value = buf.readBigUInt64BE(0);
+				if (value !== BigInt(123456789)) {
+					throw new Error('should read back the written value, got: ' + value);
+				}
+            `,
+		},
+		{
+			name: "read/write using alias",
+			script: `
+				const buf = Buffer.alloc(16);
+				const bytesWritten = buf.writeBigUint64BE(BigInt(123456789));
+				
+				if (bytesWritten !== 8) {
+					throw new Error('bytesWritten should be 8');
+				}
+				
+				const value = buf.readBigUint64BE(0);
+				if (value !== BigInt(123456789)) {
+					throw new Error('should read back the written value, got: ' + value);
+				}
+            `,
+		},
+		{
+			name: "write at non-zero offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				const bytesWritten = buf.writeBigUInt64BE(BigInt(123456789), 4);
+				
+				if (bytesWritten !== 12) {
+					throw new Error('bytesWritten should be offset + bytes written (12)');
+				}
+				
+				const value = buf.readBigUInt64BE(4);
+				if (value !== BigInt(123456789)) {
+					throw new Error('should read back the written value at offset, got: ' + value);
+				}
+            `,
+		},
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(8);
+				buf.writeBigUInt64BE(BigInt(1), 1);
+				throw new Error("should not get here");  
+            `,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(24);
+				buf.writeBigUInt64BE(BigInt(123));
+				buf.writeBigUInt64BE(BigInt(456), 8);
+				buf.writeBigUInt64BE(BigInt(789), 16);
+				
+				if (buf.readBigUInt64BE(0) !== BigInt(123)) {
+					throw new Error('first value incorrect');
+				}
+				if (buf.readBigUInt64BE(8) !== BigInt(456)) {
+					throw new Error('second value incorrect');
+				}
+				if (buf.readBigUInt64BE(16) !== BigInt(789)) {
+					throw new Error('third value incorrect');
+				}
+            `,
+		},
+		{
+			name: "write large unsigned value",
+			script: `
+				const buf = Buffer.alloc(16);
+				const largeValue = BigInt("9007199254740991"); // MAX_SAFE_INTEGER
+				buf.writeBigUInt64BE(largeValue);
+				
+				const value = buf.readBigUInt64BE(0);
+				if (value !== largeValue) {
+					throw new Error('should read back the large value, got: ' + value);
+				}
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeBigUInt64LE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with default offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				const bytesWritten = buf.writeBigUInt64LE(BigInt(123456789));
+				
+				if (bytesWritten !== 8) {
+					throw new Error('bytesWritten should be 8');
+				}
+				
+				const value = buf.readBigUInt64LE(0);
+				if (value !== BigInt(123456789)) {
+					throw new Error('should read back the written value, got: ' + value);
+				}
+            `,
+		},
+		{
+			name: "read/write using alias",
+			script: `
+				const buf = Buffer.alloc(16);
+				const bytesWritten = buf.writeBigUint64LE(BigInt(123456789));
+				
+				if (bytesWritten !== 8) {
+					throw new Error('bytesWritten should be 8');
+				}
+				
+				const value = buf.readBigUint64LE(0);
+				if (value !== BigInt(123456789)) {
+					throw new Error('should read back the written value, got: ' + value);
+				}
+            `,
+		},
+		{
+			name: "write at non-zero offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				const bytesWritten = buf.writeBigUInt64LE(BigInt(123456789), 4);
+				
+				if (bytesWritten !== 12) {
+					throw new Error('bytesWritten should be offset + bytes written (12)');
+				}
+				
+				const value = buf.readBigUInt64LE(4);
+				if (value !== BigInt(123456789)) {
+					throw new Error('should read back the written value at offset, got: ' + value);
+				}
+            `,
+		},
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(8);
+				buf.writeBigUInt64LE(BigInt(1), 1);
+				throw new Error("should not get here");  
+            `,
+			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(24);
+				buf.writeBigUInt64LE(BigInt(123));
+				buf.writeBigUInt64LE(BigInt(456), 8);
+				buf.writeBigUInt64LE(BigInt(789), 16);
+				
+				if (buf.readBigUInt64LE(0) !== BigInt(123)) {
+					throw new Error('first value incorrect');
+				}
+				if (buf.readBigUInt64LE(8) !== BigInt(456)) {
+					throw new Error('second value incorrect');
+				}
+				if (buf.readBigUInt64LE(16) !== BigInt(789)) {
+					throw new Error('third value incorrect');
+				}
+            `,
+		},
+		{
+			name: "write max uint64 value",
+			script: `
+				const buf = Buffer.alloc(16);
+				const maxUint64 = BigInt("18446744073709551615"); // 2^64 - 1
+				buf.writeBigUInt64LE(maxUint64);
+				
+				const value = buf.readBigUInt64LE(0);
+				if (value !== maxUint64) {
+					throw new Error('should read back the max uint64 value, got: ' + value);
+				}
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
