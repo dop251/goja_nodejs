@@ -1553,9 +1553,9 @@ func TestBuffer_writeBigInt64BE(t *testing.T) {
 				buf.writeBigInt64BE(BigInt(456), 8);
 				buf.writeBigInt64BE(BigInt(789), 16);
 				
-                assertValueRead(buf.readBigInt64BE(0), BigInt(123));
-                assertValueRead(buf.readBigInt64BE(8), BigInt(456));
-                assertValueRead(buf.readBigInt64BE(16), BigInt(789));	
+				assertValueRead(buf.readBigInt64BE(0), BigInt(123));
+				assertValueRead(buf.readBigInt64BE(8), BigInt(456));
+				assertValueRead(buf.readBigInt64BE(16), BigInt(789));
             `,
 		},
 	}
@@ -1600,10 +1600,10 @@ func TestBuffer_writeBigInt64LE(t *testing.T) {
 				buf.writeBigInt64LE(BigInt(123));
 				buf.writeBigInt64LE(BigInt(456), 8);
 				buf.writeBigInt64LE(BigInt(789), 16);
-				
-                assertValueRead(buf.readBigInt64LE(0), BigInt(123));
-                assertValueRead(buf.readBigInt64LE(8), BigInt(456));
-                assertValueRead(buf.readBigInt64LE(16), BigInt(789));	
+			
+				assertValueRead(buf.readBigInt64LE(0), BigInt(123));
+				assertValueRead(buf.readBigInt64LE(8), BigInt(456));
+				assertValueRead(buf.readBigInt64LE(16), BigInt(789));
             `,
 		},
 	}
@@ -1649,9 +1649,9 @@ func TestBuffer_writeBigUInt64BE(t *testing.T) {
 				buf.writeBigUInt64BE(BigInt(456), 8);
 				buf.writeBigUInt64BE(BigInt(789), 16);
 				
-                assertValueRead(buf.readBigUInt64BE(0), BigInt(123));
-                assertValueRead(buf.readBigUInt64BE(8), BigInt(456));
-                assertValueRead(buf.readBigUInt64BE(16), BigInt(789));
+				assertValueRead(buf.readBigUInt64BE(0), BigInt(123));
+				assertValueRead(buf.readBigUInt64BE(8), BigInt(456));
+				assertValueRead(buf.readBigUInt64BE(16), BigInt(789));
             `,
 		},
 		{
@@ -1703,10 +1703,10 @@ func TestBuffer_writeBigUInt64LE(t *testing.T) {
 				buf.writeBigUInt64LE(BigInt(123));
 				buf.writeBigUInt64LE(BigInt(456), 8);
 				buf.writeBigUInt64LE(BigInt(789), 16);
-
-                assertValueRead(buf.readBigUInt64LE(0), BigInt(123));
-                assertValueRead(buf.readBigUInt64LE(8), BigInt(456));
-                assertValueRead(buf.readBigUInt64LE(16), BigInt(789));	
+				
+				assertValueRead(buf.readBigUInt64LE(0), BigInt(123));
+				assertValueRead(buf.readBigUInt64LE(8), BigInt(456));
+				assertValueRead(buf.readBigUInt64LE(16), BigInt(789));
             `,
 		},
 		{
