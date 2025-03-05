@@ -343,12 +343,34 @@ func toURLSearchParamsIterator(r *goja.Runtime, v goja.Value) *urlSearchParamsIt
 	panic(errors.NewTypeError(r, errors.ErrCodeInvalidThis, `Value of "this" must be of type URLSearchParamIterator`))
 }
 
+func getIteratorPrototype(r *goja.Runtime) (iteratorProto *goja.Object) {
+	ar := r.NewArray()
+	if fn, ok := goja.AssertFunction(ar.GetSymbol(goja.SymIterator)); ok {
+		iter, err := fn(ar)
+		if err != nil {
+			panic(err)
+		}
+		iteratorProto = iter.ToObject(r).Prototype()
+		if iteratorProto == nil {
+			panic(r.NewTypeError("[][Symbol.iterator().__proto__ is null"))
+		}
+		iteratorProto = iteratorProto.Prototype()
+		if iteratorProto == nil {
+			panic(r.NewTypeError("[][Symbol.iterator().__proto__.__proto__ is null"))
+		}
+	} else {
+		panic(r.NewTypeError("[][Symbol.iterator is not a function"))
+	}
+	return
+}
+
 func (m *urlModule) getURLSearchParamsIteratorPrototype() *goja.Object {
 	if m.URLSearchParamsIteratorPrototype != nil {
 		return m.URLSearchParamsIteratorPrototype
 	}
 
 	p := m.r.NewObject()
+	p.SetPrototype(getIteratorPrototype(m.r))
 
 	p.Set("next", m.r.ToValue(func(call goja.FunctionCall) goja.Value {
 		it := toURLSearchParamsIterator(m.r, call.This)
