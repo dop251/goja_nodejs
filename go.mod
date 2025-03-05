@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/dop251/base64dec v0.0.0-20231022112746-c6c9f9a96217
-	github.com/dop251/goja v0.0.0-20250125213203-5ef83b82af17
+	github.com/dop251/goja v0.0.0-20250305215736-311323fba474
 	go.uber.org/goleak v1.3.0
 	golang.org/x/net v0.27.0
 	golang.org/x/text v0.16.0
