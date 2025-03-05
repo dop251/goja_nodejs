@@ -1,6 +1,7 @@
 package buffer
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 	"testing"
@@ -229,6 +230,9 @@ func TestBuffer_alloc(t *testing.T) {
 	}
 }
 
+//go:embed testdata/assertions.js
+var assertionsSource string
+
 type testCase struct {
 	name        string
 	script      string
@@ -238,11 +242,14 @@ type testCase struct {
 func runTestCases(t *testing.T, tcs []testCase) {
 	vm := goja.New()
 	new(require.Registry).Enable(vm)
-	_, err := vm.RunString(`const Buffer = require("node:buffer").Buffer;`)
+	_, err := vm.RunScript("testdata/assertions.js", assertionsSource)
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	_, err = vm.RunString(`const Buffer = require("node:buffer").Buffer;`)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			template := `
@@ -1473,116 +1480,70 @@ func TestBuffer_write(t *testing.T) {
 }
 
 func TestBuffer_writeBigInt64BE(t *testing.T) {
+
 	tcs := []testCase{
 		{
 			name: "write with default offset",
 			script: `
 				const buf = Buffer.alloc(16);
-				const bytesWritten = buf.writeBigInt64BE(BigInt(123456789));
-				
-				if (bytesWritten !== 8) {
-					throw new Error('bytesWritten should be 8');
-				}
-				
-				const value = buf.readBigInt64BE(0);
-				if (value !== BigInt(123456789)) {
-					throw new Error('should read back the written value, got: ' + value);
-				}
+				assertBufferWriteRead(buf, 'writeBigInt64BE', 'readBigInt64BE', BigInt(123456789)); 
             `,
 		},
 		{
 			name: "write negative number, zero offset",
 			script: `
 				const buf = Buffer.alloc(16);
-				buf.writeBigInt64BE(BigInt(-123456789), 0);
-				
-				const value = buf.readBigInt64BE(0);
-				if (value !== BigInt(-123456789)) {
-					throw new Error('should read back the written negative value, got: ' + value);
-				}
+                assertBufferWriteRead(buf, 'writeBigInt64BE', 'readBigInt64BE', BigInt(123456789), 0);
             `,
 		},
 		{
 			name: "write at non-zero offset",
 			script: `
 				const buf = Buffer.alloc(16);
-				const bytesWritten = buf.writeBigInt64BE(BigInt(123456789), 4);
-				
-				if (bytesWritten !== 12) {
-					throw new Error('bytesWritten should be offset + bytes written (12)');
-				}
-				
-				const value = buf.readBigInt64BE(4);
-				if (value !== BigInt(123456789)) {
-					throw new Error('should read back the written value at offset, got: ' + value);
-				}
+                assertBufferWriteRead(buf, 'writeBigInt64BE', 'readBigInt64BE', BigInt(123456789), 4);
             `,
 		},
 		{
 			name: "write with max int64 value",
 			script: `
 				const buf = Buffer.alloc(16);
-				const maxInt64 = BigInt("9223372036854775807"); // 2^63 - 1
-				buf.writeBigInt64BE(maxInt64);
-				
-				const value = buf.readBigInt64BE(0);
-				if (value !== maxInt64) {
-					throw new Error('should read back max int64 value, got: ' + value);
-				}
+				assertBufferWriteRead(buf, 'writeBigInt64BE', 'readBigInt64BE', BigInt("9223372036854775807")); // 2^63 - 1
             `,
 		},
 		{
 			name: "write with min int64 value",
 			script: `
 				const buf = Buffer.alloc(16);
-				const minInt64 = BigInt("-9223372036854775808"); // -2^63
-				buf.writeBigInt64BE(minInt64);
-				
-				const value = buf.readBigInt64BE(0);
-				if (value !== minInt64) {
-					throw new Error('should read back min int64 value, got: ' + value);
-				}
+				assertBufferWriteRead(buf, 'writeBigInt64BE', 'readBigInt64BE', BigInt("-9223372036854775808")); // -2^63
             `,
 		},
 		{
 			name: "write with out of range offset",
 			script: `
 				const buf = Buffer.alloc(8);
-				// this should error 
-				buf.writeBigInt64BE(BigInt(1), 1);
-				throw new Error("should not get here"); 
+				assert.throwsNodeErrorWithMessage(() => buf.writeBigInt64BE(BigInt(1), 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 1 is out of range.');
             `,
-			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
 		},
 		{
 			name: "write with negative offset",
 			script: `
 				const buf = Buffer.alloc(16);
-				// this should error 
-				buf.writeBigInt64BE(BigInt(1), -1);
-				throw new Error("should not get here"); 
+				assert.throwsNodeErrorWithMessage(() => buf.writeBigInt64BE(BigInt(1), -1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" -1 is out of range.');
             `,
-			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" -1 is out of range`,
 		},
 		{
 			name: "write without required value",
 			script: `
 				const buf = Buffer.alloc(16);
-				// this should error 
-				buf.writeBigInt64BE();
-				throw new Error("should not get here"); 
+				assert.throwsNodeErrorWithMessage(() => buf.writeBigInt64BE(), TypeError, "ERR_INVALID_ARG_TYPE", 'The "value" argument is required.');
             `,
-			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "value" argument is required`,
 		},
 		{
 			name: "write with number instead of BigInt",
 			script: `
 				const buf = Buffer.alloc(16);
-				// this should error 
-				const bytesWritten = buf.writeBigInt64BE(123456789, 0);
-				throw new Error("should not get here"); 
+				assert.throwsNodeErrorWithMessage(() => buf.writeBigInt64BE(123456789, 0), TypeError, "ERR_INVALID_ARG_TYPE", 'The "value" argument must be of type BigInt.'); 
             `,
-			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "value" argument must be of type BigInt`,
 		},
 		{
 			name: "writing and then reading different sections of buffer",
@@ -1592,15 +1553,9 @@ func TestBuffer_writeBigInt64BE(t *testing.T) {
 				buf.writeBigInt64BE(BigInt(456), 8);
 				buf.writeBigInt64BE(BigInt(789), 16);
 				
-				if (buf.readBigInt64BE(0) !== BigInt(123)) {
-					throw new Error('first value incorrect');
-				}
-				if (buf.readBigInt64BE(8) !== BigInt(456)) {
-					throw new Error('second value incorrect');
-				}
-				if (buf.readBigInt64BE(16) !== BigInt(789)) {
-					throw new Error('third value incorrect');
-				}
+                assertValueRead(buf.readBigInt64BE(0), BigInt(123));
+                assertValueRead(buf.readBigInt64BE(8), BigInt(456));
+                assertValueRead(buf.readBigInt64BE(16), BigInt(789));	
             `,
 		},
 	}
@@ -1614,54 +1569,29 @@ func TestBuffer_writeBigInt64LE(t *testing.T) {
 			name: "write with default offset",
 			script: `
 				const buf = Buffer.alloc(16);
-				const bytesWritten = buf.writeBigInt64LE(BigInt(123456789));
-				
-				if (bytesWritten !== 8) {
-					throw new Error('bytesWritten should be 8');
-				}
-				
-				const value = buf.readBigInt64LE(0);
-				if (value !== BigInt(123456789)) {
-					throw new Error('should read back the written value, got: ' + value);
-				}
+				assertBufferWriteRead(buf, 'writeBigInt64LE', 'readBigInt64LE', BigInt(123456789)); 	
             `,
 		},
 		{
 			name: "write negative number, zero offset",
 			script: `
 				const buf = Buffer.alloc(16);
-				buf.writeBigInt64LE(BigInt(-123456789), 0);
-				
-				const value = buf.readBigInt64LE(0);
-				if (value !== BigInt(-123456789)) {
-					throw new Error('should read back the written negative value, got: ' + value);
-				}
+				assertBufferWriteRead(buf, 'writeBigInt64LE', 'readBigInt64LE', BigInt(-123456789), 0); 	
             `,
 		},
 		{
 			name: "write at non-zero offset",
 			script: `
 				const buf = Buffer.alloc(16);
-				const bytesWritten = buf.writeBigInt64LE(BigInt(123456789), 4);
-				
-				if (bytesWritten !== 12) {
-					throw new Error('bytesWritten should be offset + bytes written (12)');
-				}
-				
-				const value = buf.readBigInt64LE(4);
-				if (value !== BigInt(123456789)) {
-					throw new Error('should read back the written value at offset, got: ' + value);
-				}
+                assertBufferWriteRead(buf, 'writeBigInt64LE', 'readBigInt64LE', BigInt(123456789), 4);
             `,
 		},
 		{
 			name: "write with out of range offset",
 			script: `
 				const buf = Buffer.alloc(8);
-				buf.writeBigInt64LE(BigInt(1), 1);
-				throw new Error("should not get here");  
+				assert.throwsNodeErrorWithMessage(() => buf.writeBigInt64LE(BigInt(1), 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 1 is out of range.');	
             `,
-			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
 		},
 		{
 			name: "writing and then reading different sections of buffer",
@@ -1671,15 +1601,9 @@ func TestBuffer_writeBigInt64LE(t *testing.T) {
 				buf.writeBigInt64LE(BigInt(456), 8);
 				buf.writeBigInt64LE(BigInt(789), 16);
 				
-				if (buf.readBigInt64LE(0) !== BigInt(123)) {
-					throw new Error('first value incorrect');
-				}
-				if (buf.readBigInt64LE(8) !== BigInt(456)) {
-					throw new Error('second value incorrect');
-				}
-				if (buf.readBigInt64LE(16) !== BigInt(789)) {
-					throw new Error('third value incorrect');
-				}
+                assertValueRead(buf.readBigInt64LE(0), BigInt(123));
+                assertValueRead(buf.readBigInt64LE(8), BigInt(456));
+                assertValueRead(buf.readBigInt64LE(16), BigInt(789));	
             `,
 		},
 	}
@@ -1693,58 +1617,29 @@ func TestBuffer_writeBigUInt64BE(t *testing.T) {
 			name: "write with default offset",
 			script: `
 				const buf = Buffer.alloc(16);
-				const bytesWritten = buf.writeBigUInt64BE(BigInt(123456789));
-				
-				if (bytesWritten !== 8) {
-					throw new Error('bytesWritten should be 8');
-				}
-				
-				const value = buf.readBigUInt64BE(0);
-				if (value !== BigInt(123456789)) {
-					throw new Error('should read back the written value, got: ' + value);
-				}
+				assertBufferWriteRead(buf, 'writeBigUInt64BE', 'readBigUInt64BE', BigInt(123456789));
             `,
 		},
 		{
 			name: "read/write using alias",
 			script: `
-				const buf = Buffer.alloc(16);
-				const bytesWritten = buf.writeBigUint64BE(BigInt(123456789));
-				
-				if (bytesWritten !== 8) {
-					throw new Error('bytesWritten should be 8');
-				}
-				
-				const value = buf.readBigUint64BE(0);
-				if (value !== BigInt(123456789)) {
-					throw new Error('should read back the written value, got: ' + value);
-				}
+				const buf = Buffer.alloc(16);	
+				assertBufferWriteRead(buf, 'writeBigUint64BE', 'readBigUint64BE', BigInt(123456789));	
             `,
 		},
 		{
 			name: "write at non-zero offset",
 			script: `
 				const buf = Buffer.alloc(16);
-				const bytesWritten = buf.writeBigUInt64BE(BigInt(123456789), 4);
-				
-				if (bytesWritten !== 12) {
-					throw new Error('bytesWritten should be offset + bytes written (12)');
-				}
-				
-				const value = buf.readBigUInt64BE(4);
-				if (value !== BigInt(123456789)) {
-					throw new Error('should read back the written value at offset, got: ' + value);
-				}
+				assertBufferWriteRead(buf, 'writeBigUInt64BE', 'readBigUInt64BE', BigInt(123456789), 4);
             `,
 		},
 		{
 			name: "write with out of range offset",
 			script: `
 				const buf = Buffer.alloc(8);
-				buf.writeBigUInt64BE(BigInt(1), 1);
-				throw new Error("should not get here");  
+				assert.throwsNodeErrorWithMessage(() => buf.writeBigUInt64BE(BigInt(1), 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 1 is out of range.');	  
             `,
-			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
 		},
 		{
 			name: "writing and then reading different sections of buffer",
@@ -1754,28 +1649,16 @@ func TestBuffer_writeBigUInt64BE(t *testing.T) {
 				buf.writeBigUInt64BE(BigInt(456), 8);
 				buf.writeBigUInt64BE(BigInt(789), 16);
 				
-				if (buf.readBigUInt64BE(0) !== BigInt(123)) {
-					throw new Error('first value incorrect');
-				}
-				if (buf.readBigUInt64BE(8) !== BigInt(456)) {
-					throw new Error('second value incorrect');
-				}
-				if (buf.readBigUInt64BE(16) !== BigInt(789)) {
-					throw new Error('third value incorrect');
-				}
+                assertValueRead(buf.readBigUInt64BE(0), BigInt(123));
+                assertValueRead(buf.readBigUInt64BE(8), BigInt(456));
+                assertValueRead(buf.readBigUInt64BE(16), BigInt(789));
             `,
 		},
 		{
 			name: "write large unsigned value",
 			script: `
 				const buf = Buffer.alloc(16);
-				const largeValue = BigInt("9007199254740991"); // MAX_SAFE_INTEGER
-				buf.writeBigUInt64BE(largeValue);
-				
-				const value = buf.readBigUInt64BE(0);
-				if (value !== largeValue) {
-					throw new Error('should read back the large value, got: ' + value);
-				}
+				assertBufferWriteRead(buf, 'writeBigUInt64BE', 'readBigUInt64BE',  BigInt("9007199254740991")); // MAX_SAFE_INTEGER
             `,
 		},
 	}
@@ -1789,58 +1672,29 @@ func TestBuffer_writeBigUInt64LE(t *testing.T) {
 			name: "write with default offset",
 			script: `
 				const buf = Buffer.alloc(16);
-				const bytesWritten = buf.writeBigUInt64LE(BigInt(123456789));
-				
-				if (bytesWritten !== 8) {
-					throw new Error('bytesWritten should be 8');
-				}
-				
-				const value = buf.readBigUInt64LE(0);
-				if (value !== BigInt(123456789)) {
-					throw new Error('should read back the written value, got: ' + value);
-				}
+				assertBufferWriteRead(buf, 'writeBigUInt64LE', 'readBigUInt64LE',  BigInt(123456789));
             `,
 		},
 		{
 			name: "read/write using alias",
 			script: `
 				const buf = Buffer.alloc(16);
-				const bytesWritten = buf.writeBigUint64LE(BigInt(123456789));
-				
-				if (bytesWritten !== 8) {
-					throw new Error('bytesWritten should be 8');
-				}
-				
-				const value = buf.readBigUint64LE(0);
-				if (value !== BigInt(123456789)) {
-					throw new Error('should read back the written value, got: ' + value);
-				}
+				assertBufferWriteRead(buf, 'writeBigUint64LE', 'readBigUint64LE',  BigInt(123456789));
             `,
 		},
 		{
 			name: "write at non-zero offset",
 			script: `
-				const buf = Buffer.alloc(16);
-				const bytesWritten = buf.writeBigUInt64LE(BigInt(123456789), 4);
-				
-				if (bytesWritten !== 12) {
-					throw new Error('bytesWritten should be offset + bytes written (12)');
-				}
-				
-				const value = buf.readBigUInt64LE(4);
-				if (value !== BigInt(123456789)) {
-					throw new Error('should read back the written value at offset, got: ' + value);
-				}
+				const buf = Buffer.alloc(16);	
+				assertBufferWriteRead(buf, 'writeBigUint64LE', 'readBigUint64LE',  BigInt(123456789), 4);
             `,
 		},
 		{
 			name: "write with out of range offset",
 			script: `
 				const buf = Buffer.alloc(8);
-				buf.writeBigUInt64LE(BigInt(1), 1);
-				throw new Error("should not get here");  
+				assert.throwsNodeErrorWithMessage(() => buf.writeBigUInt64LE(BigInt(1), 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 1 is out of range.');	  
             `,
-			expectedErr: `RangeError [ERR_OUT_OF_RANGE]: The value of "offset" 1 is out of range`,
 		},
 		{
 			name: "writing and then reading different sections of buffer",
@@ -1849,29 +1703,17 @@ func TestBuffer_writeBigUInt64LE(t *testing.T) {
 				buf.writeBigUInt64LE(BigInt(123));
 				buf.writeBigUInt64LE(BigInt(456), 8);
 				buf.writeBigUInt64LE(BigInt(789), 16);
-				
-				if (buf.readBigUInt64LE(0) !== BigInt(123)) {
-					throw new Error('first value incorrect');
-				}
-				if (buf.readBigUInt64LE(8) !== BigInt(456)) {
-					throw new Error('second value incorrect');
-				}
-				if (buf.readBigUInt64LE(16) !== BigInt(789)) {
-					throw new Error('third value incorrect');
-				}
+
+                assertValueRead(buf.readBigUInt64LE(0), BigInt(123));
+                assertValueRead(buf.readBigUInt64LE(8), BigInt(456));
+                assertValueRead(buf.readBigUInt64LE(16), BigInt(789));	
             `,
 		},
 		{
 			name: "write max uint64 value",
 			script: `
 				const buf = Buffer.alloc(16);
-				const maxUint64 = BigInt("18446744073709551615"); // 2^64 - 1
-				buf.writeBigUInt64LE(maxUint64);
-				
-				const value = buf.readBigUInt64LE(0);
-				if (value !== maxUint64) {
-					throw new Error('should read back the max uint64 value, got: ' + value);
-				}
+                assertBufferWriteRead(buf, 'writeBigUint64LE', 'readBigUint64LE', BigInt("18446744073709551615")); // 2^64 - 1
             `,
 		},
 	}
