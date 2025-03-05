@@ -141,6 +141,7 @@ assert.sameValue(params.toString(), "foo=def&abc=def&xyz=opq");
 params = new URLSearchParams("query=first&query=second&user=abc&double=first,second");
 const URLSearchIteratorPrototype = params.entries().__proto__;
 assert.sameValue(typeof URLSearchIteratorPrototype, "object");
+assert.sameValue(URLSearchIteratorPrototype.__proto__, [][Symbol.iterator]().__proto__.__proto__);
 
 assert.sameValue(params[Symbol.iterator], params.entries);
 
@@ -190,6 +191,8 @@ params = new URLSearchParams("query=first&query=second&user=abc");
     item = keys.next();
     assert.sameValue(item.value, undefined);
     assert.sameValue(item.done, true);
+
+    assert.sameValue(Array.from(params.keys()).length, 3);
 }
 
 params = new URLSearchParams("query=first&query=second&user=abc");
@@ -307,7 +310,6 @@ assert.sameValue(params instanceof URLSearchParams, true);
 
 {
     const url = new URL("https://test.com/");
-    const params = url.searchParams;
     url.searchParams.append("a", "1");
     assert.sameValue(url.search, "?a=1");
 }
