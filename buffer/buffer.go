@@ -680,6 +680,55 @@ func (b *Buffer) write(call goja.FunctionCall) goja.Value {
 	n := copy(bb[offset:], raw[:length])
 	return b.r.ToValue(n)
 }
+
+// writeBigInt64BE writes a big-endian 64-bit signed integer to the buffer
+func (b *Buffer) writeBigInt64BE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := b.getRequiredBigIntArgument(call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 8)
+
+	intValue := value.Int64()
+	binary.BigEndian.PutUint64(bb[offset:offset+8], uint64(intValue))
+
+	return b.r.ToValue(offset + 8)
+}
+
+// writeBigInt64LE writes a little-endian 64-bit signed integer to the buffer
+func (b *Buffer) writeBigInt64LE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := b.getRequiredBigIntArgument(call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 8)
+
+	intValue := value.Int64()
+	binary.LittleEndian.PutUint64(bb[offset:offset+8], uint64(intValue))
+
+	return b.r.ToValue(offset + 8)
+}
+
+// writeBigUInt64BE writes a big-endian 64-bit unsigned integer to the buffer
+func (b *Buffer) writeBigUInt64BE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := b.getRequiredBigIntArgument(call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 8)
+
+	uintValue := value.Uint64()
+	binary.BigEndian.PutUint64(bb[offset:offset+8], uintValue)
+
+	return b.r.ToValue(offset + 8)
+}
+
+// writeBigUInt64LE writes a little-endian 64-bit unsigned integer to the buffer
+func (b *Buffer) writeBigUInt64LE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := b.getRequiredBigIntArgument(call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 8)
+
+	uintValue := value.Uint64()
+	binary.LittleEndian.PutUint64(bb[offset:offset+8], uintValue)
+
+	return b.r.ToValue(offset + 8)
+}
+
 func (b *Buffer) getOffsetArgument(call goja.FunctionCall, argIndex int, bb []byte, numBytes int64) int64 {
 	offset := b.getOptionalIntegerArgument(call, "offset", argIndex, 0)
 
@@ -746,6 +795,20 @@ func (b *Buffer) getOptionalIntegerArgument(call goja.FunctionCall, name string,
 	panic(b.newArgumentNotNumberTypeError(name))
 }
 
+var typeBigInt = reflect.TypeOf((*big.Int)(nil))
+
+func (b *Buffer) getRequiredBigIntArgument(call goja.FunctionCall, name string, argIndex int) *big.Int {
+	arg := call.Argument(argIndex)
+	if goja.IsUndefined(arg) {
+		panic(errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The \"%s\" argument is required.", name))
+	}
+	if arg.ExportType() != typeBigInt {
+		panic(b.newArgumentNotBigIntTypeError(name))
+	}
+
+	return arg.Export().(*big.Int)
+}
+
 func (b *Buffer) getRequiredStringArgument(call goja.FunctionCall, name string, argIndex int) string {
 	arg := call.Argument(argIndex)
 	if isString(arg) {
@@ -756,6 +819,10 @@ func (b *Buffer) getRequiredStringArgument(call goja.FunctionCall, name string, 
 	}
 
 	panic(b.newArgumentNotStringTypeError(name))
+}
+
+func (b *Buffer) newArgumentNotBigIntTypeError(name string) *goja.Object {
+	return b.newNotCorrectTypeError(name, "BigInt")
 }
 
 func (b *Buffer) newArgumentNotStringTypeError(name string) *goja.Object {
@@ -771,7 +838,7 @@ func (b *Buffer) newNotCorrectTypeError(name, _type string) *goja.Object {
 }
 
 func (b *Buffer) newArgumentOutOfRangeError(name string, v int64) *goja.Object {
-	return errors.NewRangeError(b.r, errors.ErrCodeOutOfRange, "The value of \"%s\" %d is out of range", name, v)
+	return errors.NewRangeError(b.r, errors.ErrCodeOutOfRange, "The value of \"%s\" %d is out of range.", name, v)
 }
 
 func Require(runtime *goja.Runtime, module *goja.Object) {
@@ -844,6 +911,15 @@ func Require(runtime *goja.Runtime, module *goja.Object) {
 	// aliases for readUIntLE
 	proto.Set("readUintLE", b.readUIntLE)
 	proto.Set("write", b.write)
+	proto.Set("writeBigInt64BE", b.writeBigInt64BE)
+	proto.Set("writeBigInt64LE", b.writeBigInt64LE)
+	proto.Set("writeBigUInt64BE", b.writeBigUInt64BE)
+	// aliases for writeBigUInt64BE
+	proto.Set("writeBigUint64BE", b.writeBigUInt64BE)
+
+	proto.Set("writeBigUInt64LE", b.writeBigUInt64LE)
+	// aliases for writeBigUInt64LE
+	proto.Set("writeBigUint64LE", b.writeBigUInt64LE)
 
 	ctor.Set("prototype", proto)
 	ctor.Set("poolSize", 8192)
