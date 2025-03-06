@@ -23,6 +23,13 @@ type ModuleLoader func(*js.Runtime, *js.Object)
 // This error will be ignored by the resolver and the search will continue. Any other errors will be propagated.
 type SourceLoader func(path string) ([]byte, error)
 
+// PathResolver is a function that should return a canonical path of the path parameter relative to the base. The base
+// is expected to be already canonical as it would be a result of a previous call to the PathResolver for all cases
+// except for the initial evaluation, but it's a responsibility of the caller to ensure that the name of the script
+// is a canonical path. To match Node JS behaviour, it should resolve symlinks.
+// The path parameter is the argument of the require() call. The returned value will be supplied to the SourceLoader.
+type PathResolver func(base, path string) string
+
 var (
 	InvalidModuleError          = errors.New("Invalid module")
 	IllegalModuleNameError      = errors.New("Illegal module name")
@@ -39,6 +46,7 @@ type Registry struct {
 	compiled map[string]*js.Program
 
 	srcLoader     SourceLoader
+	pathResolver  PathResolver
 	globalFolders []string
 }
 
@@ -72,6 +80,14 @@ type Option func(*Registry)
 func WithLoader(srcLoader SourceLoader) Option {
 	return func(r *Registry) {
 		r.srcLoader = srcLoader
+	}
+}
+
+// WithPathResolver sets a function which will be used to resolve paths (see PathResolver). If not specified, the
+// DefaultPathResolver is used.
+func WithPathResolver(pathResolver PathResolver) Option {
+	return func(r *Registry) {
+		r.pathResolver = pathResolver
 	}
 }
 
@@ -114,8 +130,7 @@ func (r *Registry) RegisterNativeModule(name string, loader ModuleLoader) {
 
 // DefaultSourceLoader is used if none was set (see WithLoader()). It simply loads files from the host's filesystem.
 func DefaultSourceLoader(filename string) ([]byte, error) {
-	fp := filepath.FromSlash(filename)
-	f, err := os.Open(fp)
+	f, err := os.Open(filename)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			err = ModuleFileDoesNotExistError
@@ -140,6 +155,21 @@ func DefaultSourceLoader(filename string) ([]byte, error) {
 	return io.ReadAll(f)
 }
 
+// DefaultPathResolver is used if none was set (see WithPathResolver). It converts the path using filepath.FromSlash(),
+// then joins it with base and resolves symlinks on the resulting path.
+// Note, it does not make the path absolute, so to match nodejs behaviour, the initial script name should be set
+// to an absolute path.
+// The implementation is somewhat suboptimal because it runs filepath.EvalSymlinks() on the joint path, not using the
+// fact that the base path is already resolved. This is because there is no way to resolve symlinks only in a portion
+// of a path without re-implementing a significant part of filepath.FromSlash().
+func DefaultPathResolver(base, path string) string {
+	p := filepath.Join(base, filepath.FromSlash(path))
+	if resolved, err := filepath.EvalSymlinks(p); err == nil {
+		p = resolved
+	}
+	return p
+}
+
 func (r *Registry) getSource(p string) ([]byte, error) {
 	srcLoader := r.srcLoader
 	if srcLoader == nil {
@@ -160,11 +190,11 @@ func (r *Registry) getCompiledSource(p string) (*js.Program, error) {
 		}
 		s := string(buf)
 
-		if path.Ext(p) == ".json" {
+		if filepath.Ext(p) == ".json" {
 			s = "module.exports = JSON.parse('" + template.JSEscapeString(s) + "')"
 		}
 
-		source := "(function(exports, require, module) {" + s + "\n})"
+		source := "(function(exports,require,module,__filename,__dirname){" + s + "\n})"
 		parsed, err := js.Parse(p, source, parser.WithSourceMapLoader(r.srcLoader))
 		if err != nil {
 			return nil, err
