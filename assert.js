@@ -42,7 +42,7 @@ const assert = {
         throw new Error(message);
     },
 
-    throws(f, ctor, message) {
+    _throws(f, checks, message) {
         if (message === undefined) {
             message = '';
         } else {
@@ -51,32 +51,51 @@ const assert = {
         try {
             f();
         } catch (e) {
-            if (e.constructor !== ctor) {
-                throw new Error(message + "Wrong exception type was thrown: " + e.constructor.name);
+            for (const check of checks) {
+                check(e, message);
             }
             return;
         }
         throw new Error(message + "No exception was thrown");
     },
 
+    _sameErrorType(expected){
+        return function(e, message) {
+            assert.sameValue(e.constructor, expected, `${message}Wrong exception type was thrown:`);
+        }
+    },
+
+    _sameErrorCode(expected){
+        return function(e, message) {
+            assert.sameValue(e.code, expected, `${message}Wrong exception code was thrown:`);
+        }
+    },
+
+    _sameErrorMessage(expected){
+        return function(e, message) {
+            assert.sameValue(e.message, expected, `${message}Wrong exception message was thrown:`);
+        }
+    },
+
+    throws(f, ctor, message) {
+        return this._throws(f, [
+            this._sameErrorType(ctor)
+        ], message);
+    },
+
     throwsNodeError(f, ctor, code, message) {
-        if (message === undefined) {
-            message = '';
-        } else {
-            message += ' ';
-        }
-        try {
-            f();
-        } catch (e) {
-            if (e.constructor !== ctor) {
-                throw new Error(message + "Wrong exception type was thrown: " + e.constructor.name);
-            }
-            if (e.code !== code) {
-                throw new Error(message + "Wrong exception code was thrown: " + e.code);
-            }
-            return;
-        }
-        throw new Error(message + "No exception was thrown");
+        return this._throws(f, [
+            this._sameErrorType(ctor),
+            this._sameErrorCode(code)
+        ], message);
+    },
+
+    throwsNodeErrorWithMessage(f, ctor, code, errorMessage, message) {
+        return this._throws(f, [
+            this._sameErrorType(ctor),
+            this._sameErrorCode(code),
+            this._sameErrorMessage(errorMessage)
+        ], message);
     }
 }
 

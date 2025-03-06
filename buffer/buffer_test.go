@@ -1,6 +1,7 @@
 package buffer
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 	"testing"
@@ -229,6 +230,9 @@ func TestBuffer_alloc(t *testing.T) {
 	}
 }
 
+//go:embed testdata/assertions.js
+var assertionsSource string
+
 type testCase struct {
 	name        string
 	script      string
@@ -238,11 +242,14 @@ type testCase struct {
 func runTestCases(t *testing.T, tcs []testCase) {
 	vm := goja.New()
 	new(require.Registry).Enable(vm)
-	_, err := vm.RunString(`const Buffer = require("node:buffer").Buffer;`)
+	_, err := vm.RunScript("testdata/assertions.js", assertionsSource)
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	_, err = vm.RunString(`const Buffer = require("node:buffer").Buffer;`)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			template := `
@@ -1466,6 +1473,248 @@ func TestBuffer_write(t *testing.T) {
 				throw new Error("should not get here");
 			`,
 			expectedErr: `TypeError [ERR_INVALID_ARG_TYPE]: The "string" argument must be of type string`,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeBigInt64BE(t *testing.T) {
+
+	tcs := []testCase{
+		{
+			name: "write with default offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				assertBufferWriteRead(buf, 'writeBigInt64BE', 'readBigInt64BE', BigInt(123456789)); 
+            `,
+		},
+		{
+			name: "write negative number, zero offset",
+			script: `
+				const buf = Buffer.alloc(16);
+                assertBufferWriteRead(buf, 'writeBigInt64BE', 'readBigInt64BE', BigInt(123456789), 0);
+            `,
+		},
+		{
+			name: "write at non-zero offset",
+			script: `
+				const buf = Buffer.alloc(16);
+                assertBufferWriteRead(buf, 'writeBigInt64BE', 'readBigInt64BE', BigInt(123456789), 4);
+            `,
+		},
+		{
+			name: "write with max int64 value",
+			script: `
+				const buf = Buffer.alloc(16);
+				assertBufferWriteRead(buf, 'writeBigInt64BE', 'readBigInt64BE', BigInt("9223372036854775807")); // 2^63 - 1
+            `,
+		},
+		{
+			name: "write with min int64 value",
+			script: `
+				const buf = Buffer.alloc(16);
+				assertBufferWriteRead(buf, 'writeBigInt64BE', 'readBigInt64BE', BigInt("-9223372036854775808")); // -2^63
+            `,
+		},
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(8);
+				assert.throwsNodeErrorWithMessage(() => buf.writeBigInt64BE(BigInt(1), 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 1 is out of range.');
+            `,
+		},
+		{
+			name: "write with negative offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				assert.throwsNodeErrorWithMessage(() => buf.writeBigInt64BE(BigInt(1), -1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" -1 is out of range.');
+            `,
+		},
+		{
+			name: "write without required value",
+			script: `
+				const buf = Buffer.alloc(16);
+				assert.throwsNodeErrorWithMessage(() => buf.writeBigInt64BE(), TypeError, "ERR_INVALID_ARG_TYPE", 'The "value" argument is required.');
+            `,
+		},
+		{
+			name: "write with number instead of BigInt",
+			script: `
+				const buf = Buffer.alloc(16);
+				assert.throwsNodeErrorWithMessage(() => buf.writeBigInt64BE(123456789, 0), TypeError, "ERR_INVALID_ARG_TYPE", 'The "value" argument must be of type BigInt.'); 
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(24);
+				buf.writeBigInt64BE(BigInt(123));
+				buf.writeBigInt64BE(BigInt(456), 8);
+				buf.writeBigInt64BE(BigInt(789), 16);
+				
+				assertValueRead(buf.readBigInt64BE(0), BigInt(123));
+				assertValueRead(buf.readBigInt64BE(8), BigInt(456));
+				assertValueRead(buf.readBigInt64BE(16), BigInt(789));
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeBigInt64LE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with default offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				assertBufferWriteRead(buf, 'writeBigInt64LE', 'readBigInt64LE', BigInt(123456789)); 	
+            `,
+		},
+		{
+			name: "write negative number, zero offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				assertBufferWriteRead(buf, 'writeBigInt64LE', 'readBigInt64LE', BigInt(-123456789), 0); 	
+            `,
+		},
+		{
+			name: "write at non-zero offset",
+			script: `
+				const buf = Buffer.alloc(16);
+                assertBufferWriteRead(buf, 'writeBigInt64LE', 'readBigInt64LE', BigInt(123456789), 4);
+            `,
+		},
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(8);
+				assert.throwsNodeErrorWithMessage(() => buf.writeBigInt64LE(BigInt(1), 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 1 is out of range.');	
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(24);
+				buf.writeBigInt64LE(BigInt(123));
+				buf.writeBigInt64LE(BigInt(456), 8);
+				buf.writeBigInt64LE(BigInt(789), 16);
+			
+				assertValueRead(buf.readBigInt64LE(0), BigInt(123));
+				assertValueRead(buf.readBigInt64LE(8), BigInt(456));
+				assertValueRead(buf.readBigInt64LE(16), BigInt(789));
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeBigUInt64BE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with default offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				assertBufferWriteRead(buf, 'writeBigUInt64BE', 'readBigUInt64BE', BigInt(123456789));
+            `,
+		},
+		{
+			name: "read/write using alias",
+			script: `
+				const buf = Buffer.alloc(16);	
+				assertBufferWriteRead(buf, 'writeBigUint64BE', 'readBigUint64BE', BigInt(123456789));	
+            `,
+		},
+		{
+			name: "write at non-zero offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				assertBufferWriteRead(buf, 'writeBigUInt64BE', 'readBigUInt64BE', BigInt(123456789), 4);
+            `,
+		},
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(8);
+				assert.throwsNodeErrorWithMessage(() => buf.writeBigUInt64BE(BigInt(1), 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 1 is out of range.');	  
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(24);
+				buf.writeBigUInt64BE(BigInt(123));
+				buf.writeBigUInt64BE(BigInt(456), 8);
+				buf.writeBigUInt64BE(BigInt(789), 16);
+				
+				assertValueRead(buf.readBigUInt64BE(0), BigInt(123));
+				assertValueRead(buf.readBigUInt64BE(8), BigInt(456));
+				assertValueRead(buf.readBigUInt64BE(16), BigInt(789));
+            `,
+		},
+		{
+			name: "write large unsigned value",
+			script: `
+				const buf = Buffer.alloc(16);
+				assertBufferWriteRead(buf, 'writeBigUInt64BE', 'readBigUInt64BE',  BigInt("9007199254740991")); // MAX_SAFE_INTEGER
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeBigUInt64LE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with default offset",
+			script: `
+				const buf = Buffer.alloc(16);
+				assertBufferWriteRead(buf, 'writeBigUInt64LE', 'readBigUInt64LE',  BigInt(123456789));
+            `,
+		},
+		{
+			name: "read/write using alias",
+			script: `
+				const buf = Buffer.alloc(16);
+				assertBufferWriteRead(buf, 'writeBigUint64LE', 'readBigUint64LE',  BigInt(123456789));
+            `,
+		},
+		{
+			name: "write at non-zero offset",
+			script: `
+				const buf = Buffer.alloc(16);	
+				assertBufferWriteRead(buf, 'writeBigUint64LE', 'readBigUint64LE',  BigInt(123456789), 4);
+            `,
+		},
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(8);
+				assert.throwsNodeErrorWithMessage(() => buf.writeBigUInt64LE(BigInt(1), 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 1 is out of range.');	  
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(24);
+				buf.writeBigUInt64LE(BigInt(123));
+				buf.writeBigUInt64LE(BigInt(456), 8);
+				buf.writeBigUInt64LE(BigInt(789), 16);
+				
+				assertValueRead(buf.readBigUInt64LE(0), BigInt(123));
+				assertValueRead(buf.readBigUInt64LE(8), BigInt(456));
+				assertValueRead(buf.readBigUInt64LE(16), BigInt(789));
+            `,
+		},
+		{
+			name: "write max uint64 value",
+			script: `
+				const buf = Buffer.alloc(16);
+                assertBufferWriteRead(buf, 'writeBigUint64LE', 'readBigUint64LE', BigInt("18446744073709551615")); // 2^64 - 1
+            `,
 		},
 	}
 
