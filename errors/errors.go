@@ -75,3 +75,23 @@ func NewError(r *goja.Runtime, ctor *goja.Object, code string, args ...interface
 	addProps(r, o, code)
 	return o
 }
+
+func NewArgumentNotBigIntTypeError(r *goja.Runtime, name string) *goja.Object {
+	return NewNotCorrectTypeError(r, name, "BigInt")
+}
+
+func NewArgumentNotStringTypeError(r *goja.Runtime, name string) *goja.Object {
+	return NewNotCorrectTypeError(r, name, "string")
+}
+
+func NewArgumentNotNumberTypeError(r *goja.Runtime, name string) *goja.Object {
+	return NewNotCorrectTypeError(r, name, "number")
+}
+
+func NewNotCorrectTypeError(r *goja.Runtime, name, _type string) *goja.Object {
+	return NewTypeError(r, ErrCodeInvalidArgType, "The \"%s\" argument must be of type %s.", name, _type)
+}
+
+func NewArgumentOutOfRangeError(r *goja.Runtime, name string, v int64) *goja.Object {
+	return NewRangeError(r, ErrCodeOutOfRange, "The value of \"%s\" %d is out of range.", name, v)
+}

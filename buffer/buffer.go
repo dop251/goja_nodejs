@@ -12,6 +12,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/errors"
+	"github.com/dop251/goja_nodejs/goutil"
 	"github.com/dop251/goja_nodejs/require"
 
 	"github.com/dop251/base64dec"
@@ -329,18 +330,6 @@ func (b *Buffer) from(call goja.FunctionCall) goja.Value {
 	return b._from(call.Arguments...)
 }
 
-func isNumber(v goja.Value) bool {
-	switch v.ExportType() {
-	case reflectTypeInt, reflectTypeFloat:
-		return true
-	}
-	return false
-}
-
-func isString(v goja.Value) bool {
-	return v.ExportType() == reflectTypeString
-}
-
 func StringCodecByName(name string) StringCodec {
 	return stringCodecs[name]
 }
@@ -372,18 +361,18 @@ func (b *Buffer) fill(buf []byte, fill string, enc goja.Value) []byte {
 func (b *Buffer) alloc(call goja.FunctionCall) goja.Value {
 	arg0 := call.Argument(0)
 	size := -1
-	if isNumber(arg0) {
+	if goja.IsNumber(arg0) {
 		size = int(arg0.ToInteger())
 	}
 	if size < 0 {
-		panic(b.newArgumentNotNumberTypeError("size"))
+		panic(errors.NewArgumentNotNumberTypeError(b.r, "size"))
 	}
 	fill := call.Argument(1)
 	buf := make([]byte, size)
 	if !goja.IsUndefined(fill) {
-		if isString(fill) {
+		if goja.IsString(fill) {
 			var enc goja.Value
-			if a := call.Argument(2); isString(a) {
+			if a := call.Argument(2); goja.IsString(a) {
 				enc = a
 			} else {
 				enc = goja.Undefined()
@@ -407,7 +396,7 @@ func (b *Buffer) alloc(call goja.FunctionCall) goja.Value {
 func (b *Buffer) proto_toString(call goja.FunctionCall) goja.Value {
 	bb := Bytes(b.r, call.This)
 	codec := b.getStringCodec(call.Argument(0))
-	start := b.getCoercedIntegerArgument(call, 1, 0, 0)
+	start := goutil.CoercedIntegerArgument(call, 1, 0, 0)
 
 	// Node's Buffer class makes this zero if it is negative
 	if start < 0 {
@@ -418,7 +407,7 @@ func (b *Buffer) proto_toString(call goja.FunctionCall) goja.Value {
 	}
 
 	// NOTE that Node will default to the length of the buffer, but uses 0 for type mismatch defaults
-	end := b.getCoercedIntegerArgument(call, 2, int64(len(bb)), 0)
+	end := goutil.CoercedIntegerArgument(call, 2, int64(len(bb)), 0)
 	if end < 0 || start >= end {
 		// returns an empty string if end < 0 or start >= end
 		return b.r.ToValue("")
@@ -663,13 +652,13 @@ func (b *Buffer) readUIntLE(call goja.FunctionCall) goja.Value {
 // will be written.
 func (b *Buffer) write(call goja.FunctionCall) goja.Value {
 	bb := Bytes(b.r, call.This)
-	str := b.getRequiredStringArgument(call, "string", 0)
+	str := goutil.RequiredStringArgument(b.r, call, "string", 0)
 	// note that we are passing in zero for numBytes, since the length parameter, which depends on offset,
 	// will dictate the number of bytes
 	offset := b.getOffsetArgument(call, 1, bb, 0)
 	// the length defaults to the size of the buffer - offset
 	maxLength := int64(len(bb)) - offset
-	length := b.getOptionalIntegerArgument(call, "length", 2, maxLength)
+	length := goutil.OptionalIntegerArgument(b.r, call, "length", 2, maxLength)
 	codec := b.getStringCodec(call.Argument(3))
 
 	raw := codec.Decode(str)
@@ -684,7 +673,7 @@ func (b *Buffer) write(call goja.FunctionCall) goja.Value {
 // writeBigInt64BE writes a big-endian 64-bit signed integer to the buffer
 func (b *Buffer) writeBigInt64BE(call goja.FunctionCall) goja.Value {
 	bb := Bytes(b.r, call.This)
-	value := b.getRequiredBigIntArgument(call, "value", 0)
+	value := goutil.RequiredBigIntArgument(b.r, call, "value", 0)
 	offset := b.getOffsetArgument(call, 1, bb, 8)
 
 	intValue := value.Int64()
@@ -696,7 +685,7 @@ func (b *Buffer) writeBigInt64BE(call goja.FunctionCall) goja.Value {
 // writeBigInt64LE writes a little-endian 64-bit signed integer to the buffer
 func (b *Buffer) writeBigInt64LE(call goja.FunctionCall) goja.Value {
 	bb := Bytes(b.r, call.This)
-	value := b.getRequiredBigIntArgument(call, "value", 0)
+	value := goutil.RequiredBigIntArgument(b.r, call, "value", 0)
 	offset := b.getOffsetArgument(call, 1, bb, 8)
 
 	intValue := value.Int64()
@@ -708,7 +697,7 @@ func (b *Buffer) writeBigInt64LE(call goja.FunctionCall) goja.Value {
 // writeBigUInt64BE writes a big-endian 64-bit unsigned integer to the buffer
 func (b *Buffer) writeBigUInt64BE(call goja.FunctionCall) goja.Value {
 	bb := Bytes(b.r, call.This)
-	value := b.getRequiredBigIntArgument(call, "value", 0)
+	value := goutil.RequiredBigIntArgument(b.r, call, "value", 0)
 	offset := b.getOffsetArgument(call, 1, bb, 8)
 
 	uintValue := value.Uint64()
@@ -720,7 +709,7 @@ func (b *Buffer) writeBigUInt64BE(call goja.FunctionCall) goja.Value {
 // writeBigUInt64LE writes a little-endian 64-bit unsigned integer to the buffer
 func (b *Buffer) writeBigUInt64LE(call goja.FunctionCall) goja.Value {
 	bb := Bytes(b.r, call.This)
-	value := b.getRequiredBigIntArgument(call, "value", 0)
+	value := goutil.RequiredBigIntArgument(b.r, call, "value", 0)
 	offset := b.getOffsetArgument(call, 1, bb, 8)
 
 	uintValue := value.Uint64()
@@ -730,24 +719,24 @@ func (b *Buffer) writeBigUInt64LE(call goja.FunctionCall) goja.Value {
 }
 
 func (b *Buffer) getOffsetArgument(call goja.FunctionCall, argIndex int, bb []byte, numBytes int64) int64 {
-	offset := b.getOptionalIntegerArgument(call, "offset", argIndex, 0)
+	offset := goutil.OptionalIntegerArgument(b.r, call, "offset", argIndex, 0)
 
 	if offset < 0 || offset+numBytes > int64(len(bb)) {
-		panic(b.newArgumentOutOfRangeError("offset", offset))
+		panic(errors.NewArgumentOutOfRangeError(b.r, "offset", offset))
 	}
 
 	return offset
 }
 
 func (b *Buffer) getVariableLengthReadArguments(call goja.FunctionCall, bb []byte) (int64, int64) {
-	offset := b.getRequiredIntegerArgument(call, "offset", 0)
-	byteLength := b.getRequiredIntegerArgument(call, "byteLength", 1)
+	offset := goutil.RequiredIntegerArgument(b.r, call, "offset", 0)
+	byteLength := goutil.RequiredIntegerArgument(b.r, call, "byteLength", 1)
 
 	if byteLength < 1 || byteLength > 6 {
-		panic(b.newArgumentOutOfRangeError("byteLength", byteLength))
+		panic(errors.NewArgumentOutOfRangeError(b.r, "byteLength", byteLength))
 	}
 	if offset < 0 || offset+byteLength > int64(len(bb)) {
-		panic(b.newArgumentOutOfRangeError("offset", offset))
+		panic(errors.NewArgumentOutOfRangeError(b.r, "offset", offset))
 	}
 
 	return offset, byteLength
@@ -757,88 +746,6 @@ func signExtend(value int64, numBytes int64) int64 {
 	// we don't have to turn this to a uint64 first because numBytes < 8 so
 	// the sign bit will never pushed out of the int64 range
 	return (value << (64 - 8*numBytes)) >> (64 - 8*numBytes)
-}
-
-func (b *Buffer) getRequiredIntegerArgument(call goja.FunctionCall, name string, argIndex int) int64 {
-	arg := call.Argument(argIndex)
-	if isNumber(arg) {
-		return arg.ToInteger()
-	}
-	if goja.IsUndefined(arg) {
-		panic(errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The \"%s\" argument is required.", name))
-	}
-
-	panic(b.newArgumentNotNumberTypeError(name))
-}
-
-func (b *Buffer) getCoercedIntegerArgument(call goja.FunctionCall, argIndex int, defaultValue int64, typeMistMatchValue int64) int64 {
-	arg := call.Argument(argIndex)
-	if isNumber(arg) {
-		return arg.ToInteger()
-	}
-	if goja.IsUndefined(arg) {
-		return defaultValue
-	}
-
-	return typeMistMatchValue
-}
-
-func (b *Buffer) getOptionalIntegerArgument(call goja.FunctionCall, name string, argIndex int, defaultValue int64) int64 {
-	arg := call.Argument(argIndex)
-	if isNumber(arg) {
-		return arg.ToInteger()
-	}
-	if goja.IsUndefined(arg) {
-		return defaultValue
-	}
-
-	panic(b.newArgumentNotNumberTypeError(name))
-}
-
-var typeBigInt = reflect.TypeOf((*big.Int)(nil))
-
-func (b *Buffer) getRequiredBigIntArgument(call goja.FunctionCall, name string, argIndex int) *big.Int {
-	arg := call.Argument(argIndex)
-	if goja.IsUndefined(arg) {
-		panic(errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The \"%s\" argument is required.", name))
-	}
-	if arg.ExportType() != typeBigInt {
-		panic(b.newArgumentNotBigIntTypeError(name))
-	}
-
-	return arg.Export().(*big.Int)
-}
-
-func (b *Buffer) getRequiredStringArgument(call goja.FunctionCall, name string, argIndex int) string {
-	arg := call.Argument(argIndex)
-	if isString(arg) {
-		return arg.String()
-	}
-	if goja.IsUndefined(arg) {
-		panic(errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The \"%s\" argument is required.", name))
-	}
-
-	panic(b.newArgumentNotStringTypeError(name))
-}
-
-func (b *Buffer) newArgumentNotBigIntTypeError(name string) *goja.Object {
-	return b.newNotCorrectTypeError(name, "BigInt")
-}
-
-func (b *Buffer) newArgumentNotStringTypeError(name string) *goja.Object {
-	return b.newNotCorrectTypeError(name, "string")
-}
-
-func (b *Buffer) newArgumentNotNumberTypeError(name string) *goja.Object {
-	return b.newNotCorrectTypeError(name, "number")
-}
-
-func (b *Buffer) newNotCorrectTypeError(name, _type string) *goja.Object {
-	return errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The \"%s\" argument must be of type %s.", name, _type)
-}
-
-func (b *Buffer) newArgumentOutOfRangeError(name string, v int64) *goja.Object {
-	return errors.NewRangeError(b.r, errors.ErrCodeOutOfRange, "The value of \"%s\" %d is out of range.", name, v)
 }
 
 func Require(runtime *goja.Runtime, module *goja.Object) {
