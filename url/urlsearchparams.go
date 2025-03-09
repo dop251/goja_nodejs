@@ -22,8 +22,8 @@ func newMissingArgsError(r *goja.Runtime, msg string) *goja.Object {
 	return errors.NewTypeError(r, errors.ErrCodeMissingArgs, msg)
 }
 
-func newInvalidArgsError(r *goja.Runtime) *goja.Object {
-	return errors.NewTypeError(r, "ERR_INVALID_ARG_TYPE", `The "callback" argument must be of type function.`)
+func newInvalidCallbackTypeError(r *goja.Runtime) *goja.Object {
+	return errors.NewNotCorrectTypeError(r, "callback", "function")
 }
 
 func toUrlSearchParams(r *goja.Runtime, v goja.Value) *urlSearchParams {
@@ -177,10 +177,6 @@ func (m *urlModule) createURLSearchParamsPrototype() *goja.Object {
 	p.Set("forEach", m.r.ToValue(func(call goja.FunctionCall) goja.Value {
 		u := toUrlSearchParams(m.r, call.This)
 
-		if len(call.Arguments) != 1 {
-			panic(newInvalidArgsError(m.r))
-		}
-
 		if fn, ok := goja.AssertFunction(call.Argument(0)); ok {
 			for _, pair := range u.searchParams {
 				// name, value, searchParams
@@ -196,7 +192,7 @@ func (m *urlModule) createURLSearchParamsPrototype() *goja.Object {
 				}
 			}
 		} else {
-			panic(newInvalidArgsError(m.r))
+			panic(newInvalidCallbackTypeError(m.r))
 		}
 
 		return goja.Undefined()
