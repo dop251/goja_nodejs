@@ -88,6 +88,7 @@ assert.sameValue(myURL.href, "https://abc:123@example.com/");
 myURL = new URL("https://example.org/abc/xyz?123");
 myURL.pathname = "/abcdef";
 assert.sameValue(myURL.href, "https://example.org/abcdef?123");
+assert.sameValue(myURL.toString(), "https://example.org/abcdef?123");
 
 myURL.pathname = "";
 assert.sameValue(myURL.href, "https://example.org/?123");
@@ -95,6 +96,32 @@ assert.sameValue(myURL.href, "https://example.org/?123");
 myURL.pathname = "á";
 assert.sameValue(myURL.pathname, "/%C3%A1");
 assert.sameValue(myURL.href, "https://example.org/%C3%A1?123");
+
+myURL = new URL("file:///./abc");
+assert.sameValue(myURL.pathname, "/abc");
+
+myURL = new URL("fish://host/.");
+assert.sameValue(myURL.pathname, "/");
+myURL.pathname = ".";
+assert.sameValue(myURL.pathname, "/");
+
+myURL = new URL("fish://host/a/../b");
+assert.sameValue(myURL.pathname, '/b');
+myURL.pathname = 'a/../c';
+assert.sameValue(myURL.pathname, '/c');
+
+myURL = new URL("file://");
+assert.sameValue(myURL.pathname, "/");
+assert.sameValue(myURL.href, "file:///");
+
+assert.throwsNodeError(() => {
+    new URL("http://");
+}, TypeError, "ERR_INVALID_URL");
+
+// myURL = new URL("fish://");
+// assert.sameValue(myURL.pathname, "");
+// Currently returns "fish:"
+// assert.sameValue(myURL.href, "fish://");
 
 // port
 
@@ -226,4 +253,10 @@ assert.sameValue(myURL.toString(), "https://example.com/?first=one");
     assert.sameValue(url.domainToUnicode('xn--espaol-zwa.com'), "español.com");
     assert.sameValue(url.domainToUnicode('xn--fiq228c.com'), "中文.com");
     assert.sameValue(url.domainToUnicode('xn--iñvalid.com'), "");
+}
+
+{
+    const url = new URL("otpauth://totp");
+    url.pathname = 'domain.com Domain:user@domain.com';
+    assert.sameValue(url.toString(), 'otpauth://totp/domain.com%20Domain:user@domain.com');
 }
