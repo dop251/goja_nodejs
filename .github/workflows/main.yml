@@ -34,3 +34,36 @@ jobs:
         env:
           GOARCH: ${{ matrix.arch }}
         run: go test -vet=off ./...
+
+  test-types:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          npm ci
+          npm test --workspaces
+
+  publish-types:
+    name: 'Publish type definitions to npm'
+    needs: [test, test-types]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Extract version
+        run: |
+          VERSION=$(echo "${{ github.ref }}" | sed 's|refs/tags/v||')
+          if [[ "$VERSION" == [0-9].* ]]; then
+            echo "version=$VERSION" >> $GITHUB_ENV
+          fi
+      - uses: './.github/actions/publish-types'
+        if: env.version != ''
+        with:
+          VERSION: ${{ env.version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+  publish-types-test:
+    needs: [ test, test-types ]
+    runs-on: ubuntu-latest
+     - uses: './.github/actions/publish-types'
+     with:
+       VERSION: "1.0.0"
+       NODE_AUTH_TOKEN: "dummy"

@@ -1,0 +1,19 @@
+{
+  "name": "@dop251/types-goja_nodejs-url",
+  "version": "0.0.1",
+  "types": "url.d.ts",
+  "scripts": {
+    "test": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dop251/goja_nodejs.git"
+  },
+  "dependencies": {
+    "@dop251/types-goja_nodejs-global": "0.0.1"
+  },
+  "devDependencies": {
+    "typescript": "next"
+  },
+  "private": true
+}
