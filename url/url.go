@@ -3,6 +3,7 @@ package url
 import (
 	"math"
 	"net/url"
+	"path"
 	"reflect"
 	"strconv"
 	"strings"
@@ -131,6 +132,14 @@ func isSpecialProtocol(protocol string) bool {
 	return false
 }
 
+func isSpecialNetProtocol(protocol string) bool {
+	switch protocol {
+	case "https", "http", "ftp", "wss", "ws":
+		return true
+	}
+	return false
+}
+
 func clearURLPort(u *url.URL) {
 	u.Host = u.Hostname()
 }
@@ -167,6 +176,9 @@ func (m *urlModule) parseURL(s string, isBase bool) *url.URL {
 	if isBase && !u.IsAbs() {
 		panic(m.newInvalidURLError(URLNotAbsolute, s))
 	}
+	if isSpecialNetProtocol(u.Scheme) && u.Host == "" && u.Path == "" {
+		panic(m.newInvalidURLError(InvalidURL, s))
+	}
 	if portStr := u.Port(); portStr != "" {
 		if port, err := strconv.Atoi(portStr); err != nil || isDefaultURLPort(u.Scheme, port) {
 			u.Host = u.Hostname() // Clear port
@@ -182,12 +194,19 @@ func fixRawQuery(u *url.URL) {
 	}
 }
 
+func cleanPath(p, proto string) string {
+	if !strings.HasPrefix(p, "/") && (isSpecialProtocol(proto) || p != "") {
+		p = "/" + p
+	}
+	if p != "" {
+		return path.Clean(p)
+	}
+	return ""
+}
+
 func (m *urlModule) fixURL(u *url.URL) {
-	switch u.Scheme {
-	case "https", "http", "ftp", "wss", "ws":
-		if u.Path == "" {
-			u.Path = "/"
-		}
+	u.Path = cleanPath(u.Path, u.Scheme)
+	if isSpecialNetProtocol(u.Scheme) {
 		hostname := u.Hostname()
 		lh := strings.ToLower(hostname)
 		ch, err := idna.Punycode.ToASCII(lh)
@@ -262,16 +281,7 @@ func (m *urlModule) createURLPrototype() *goja.Object {
 	m.defineURLAccessorProp(p, "pathname", func(u *nodeURL) interface{} {
 		return u.url.EscapedPath()
 	}, func(u *nodeURL, arg goja.Value) {
-		p := arg.String()
-		if _, err := url.Parse(p); err == nil {
-			switch u.url.Scheme {
-			case "https", "http", "ftp", "ws", "wss":
-				if !strings.HasPrefix(p, "/") {
-					p = "/" + p
-				}
-			}
-			u.url.Path = p
-		}
+		u.url.Path = cleanPath(arg.String(), u.url.Scheme)
 	})
 
 	// origin

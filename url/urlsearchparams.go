@@ -22,8 +22,8 @@ func newMissingArgsError(r *goja.Runtime, msg string) *goja.Object {
 	return errors.NewTypeError(r, errors.ErrCodeMissingArgs, msg)
 }
 
-func newInvalidArgsError(r *goja.Runtime) *goja.Object {
-	return errors.NewTypeError(r, "ERR_INVALID_ARG_TYPE", `The "callback" argument must be of type function.`)
+func newInvalidCallbackTypeError(r *goja.Runtime) *goja.Object {
+	return errors.NewNotCorrectTypeError(r, "callback", "function")
 }
 
 func toUrlSearchParams(r *goja.Runtime, v goja.Value) *urlSearchParams {
@@ -177,10 +177,6 @@ func (m *urlModule) createURLSearchParamsPrototype() *goja.Object {
 	p.Set("forEach", m.r.ToValue(func(call goja.FunctionCall) goja.Value {
 		u := toUrlSearchParams(m.r, call.This)
 
-		if len(call.Arguments) != 1 {
-			panic(newInvalidArgsError(m.r))
-		}
-
 		if fn, ok := goja.AssertFunction(call.Argument(0)); ok {
 			for _, pair := range u.searchParams {
 				// name, value, searchParams
@@ -196,7 +192,7 @@ func (m *urlModule) createURLSearchParamsPrototype() *goja.Object {
 				}
 			}
 		} else {
-			panic(newInvalidArgsError(m.r))
+			panic(newInvalidCallbackTypeError(m.r))
 		}
 
 		return goja.Undefined()
@@ -343,12 +339,34 @@ func toURLSearchParamsIterator(r *goja.Runtime, v goja.Value) *urlSearchParamsIt
 	panic(errors.NewTypeError(r, errors.ErrCodeInvalidThis, `Value of "this" must be of type URLSearchParamIterator`))
 }
 
+func getIteratorPrototype(r *goja.Runtime) (iteratorProto *goja.Object) {
+	ar := r.NewArray()
+	if fn, ok := goja.AssertFunction(ar.GetSymbol(goja.SymIterator)); ok {
+		iter, err := fn(ar)
+		if err != nil {
+			panic(err)
+		}
+		iteratorProto = iter.ToObject(r).Prototype()
+		if iteratorProto == nil {
+			panic(r.NewTypeError("[][Symbol.iterator().__proto__ is null"))
+		}
+		iteratorProto = iteratorProto.Prototype()
+		if iteratorProto == nil {
+			panic(r.NewTypeError("[][Symbol.iterator().__proto__.__proto__ is null"))
+		}
+	} else {
+		panic(r.NewTypeError("[][Symbol.iterator is not a function"))
+	}
+	return
+}
+
 func (m *urlModule) getURLSearchParamsIteratorPrototype() *goja.Object {
 	if m.URLSearchParamsIteratorPrototype != nil {
 		return m.URLSearchParamsIteratorPrototype
 	}
 
 	p := m.r.NewObject()
+	p.SetPrototype(getIteratorPrototype(m.r))
 
 	p.Set("next", m.r.ToValue(func(call goja.FunctionCall) goja.Value {
 		it := toURLSearchParamsIterator(m.r, call.This)
