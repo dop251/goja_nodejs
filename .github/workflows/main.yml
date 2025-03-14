@@ -63,7 +63,8 @@ jobs:
   publish-types-test:
     needs: [ test, test-types ]
     runs-on: ubuntu-latest
+    steps:
      - uses: './.github/actions/publish-types'
-     with:
-       VERSION: "1.0.0"
-       NODE_AUTH_TOKEN: "dummy"
+       with:
+        VERSION: "1.0.0"
+        NODE_AUTH_TOKEN: "dummy"
