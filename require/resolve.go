@@ -3,7 +3,6 @@ package require
 import (
 	"encoding/json"
 	"errors"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -13,24 +12,24 @@ import (
 
 const NodePrefix = "node:"
 
+func (r *RequireModule) resolvePath(base, name string) string {
+	if r.r.pathResolver != nil {
+		return r.r.pathResolver(base, name)
+	}
+	return DefaultPathResolver(base, name)
+}
+
 // NodeJS module search algorithm described by
 // https://nodejs.org/api/modules.html#modules_all_together
 func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
-	origPath, modpath := modpath, filepathClean(modpath)
-	if modpath == "" {
-		return nil, IllegalModuleNameError
-	}
-
 	var start string
 	err = nil
-	if path.IsAbs(origPath) {
-		start = "/"
-	} else {
+	if !filepath.IsAbs(modpath) {
 		start = r.getCurrentModulePath()
 	}
 
-	p := path.Join(start, modpath)
-	if isFileOrDirectoryPath(origPath) {
+	p := r.resolvePath(start, modpath)
+	if isFileOrDirectoryPath(modpath) {
 		if module = r.modules[p]; module != nil {
 			return
 		}
@@ -39,7 +38,7 @@ func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
 			r.modules[p] = module
 		}
 	} else {
-		module, err = r.loadNative(origPath)
+		module, err = r.loadNative(modpath)
 		if err == nil {
 			return
 		} else {
@@ -130,17 +129,17 @@ func (r *RequireModule) loadAsFile(path string) (module *js.Object, err error) {
 }
 
 func (r *RequireModule) loadIndex(modpath string) (module *js.Object, err error) {
-	p := path.Join(modpath, "index.js")
+	p := r.resolvePath(modpath, "index.js")
 	if module, err = r.loadModule(p); module != nil || err != nil {
 		return
 	}
 
-	p = path.Join(modpath, "index.json")
+	p = r.resolvePath(modpath, "index.json")
 	return r.loadModule(p)
 }
 
 func (r *RequireModule) loadAsDirectory(modpath string) (module *js.Object, err error) {
-	p := path.Join(modpath, "package.json")
+	p := r.resolvePath(modpath, "package.json")
 	buf, err := r.r.getSource(p)
 	if err != nil {
 		return r.loadIndex(modpath)
@@ -153,7 +152,7 @@ func (r *RequireModule) loadAsDirectory(modpath string) (module *js.Object, err 
 		return r.loadIndex(modpath)
 	}
 
-	m := path.Join(modpath, pkg.Main)
+	m := r.resolvePath(modpath, pkg.Main)
 	if module, err = r.loadAsFile(m); module != nil || err != nil {
 		return
 	}
@@ -162,7 +161,7 @@ func (r *RequireModule) loadAsDirectory(modpath string) (module *js.Object, err 
 }
 
 func (r *RequireModule) loadNodeModule(modpath, start string) (*js.Object, error) {
-	return r.loadAsFileOrDirectory(path.Join(start, modpath))
+	return r.loadAsFileOrDirectory(r.resolvePath(start, modpath))
 }
 
 func (r *RequireModule) loadNodeModules(modpath, start string) (module *js.Object, err error) {
@@ -173,8 +172,8 @@ func (r *RequireModule) loadNodeModules(modpath, start string) (module *js.Objec
 	}
 	for {
 		var p string
-		if path.Base(start) != "node_modules" {
-			p = path.Join(start, "node_modules")
+		if filepath.Base(start) != "node_modules" {
+			p = filepath.Join(start, "node_modules")
 		} else {
 			p = start
 		}
@@ -184,7 +183,7 @@ func (r *RequireModule) loadNodeModules(modpath, start string) (module *js.Objec
 		if start == ".." { // Dir('..') is '.'
 			break
 		}
-		parent := path.Dir(start)
+		parent := filepath.Dir(start)
 		if parent == start {
 			break
 		}
@@ -200,7 +199,7 @@ func (r *RequireModule) getCurrentModulePath() string {
 	if len(frames) < 2 {
 		return "."
 	}
-	return path.Dir(frames[1].SrcName())
+	return filepath.Dir(frames[1].SrcName())
 }
 
 func (r *RequireModule) createModuleObject() *js.Object {
@@ -248,7 +247,7 @@ func (r *RequireModule) loadModuleFile(path string, jsModule *js.Object) error {
 		// "jsExports" as the "exports" variable, "jsRequire"
 		// as the "require" variable and "jsModule" as the
 		// "module" variable (Nodejs capable).
-		_, err = call(jsExports, jsExports, jsRequire, jsModule)
+		_, err = call(jsExports, jsExports, jsRequire, jsModule, r.runtime.ToValue(path), r.runtime.ToValue(filepath.Dir(path)))
 		if err != nil {
 			return err
 		}

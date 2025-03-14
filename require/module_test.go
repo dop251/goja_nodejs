@@ -9,14 +9,15 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"syscall"
 	"testing"
 
 	js "github.com/dop251/goja"
 )
 
 func mapFileSystemSourceLoader(files map[string]string) SourceLoader {
-	return func(path string) ([]byte, error) {
-		s, ok := files[path]
+	return func(p string) ([]byte, error) {
+		s, ok := files[filepath.ToSlash(p)]
 		if !ok {
 			return nil, ModuleFileDoesNotExistError
 		}
@@ -463,7 +464,7 @@ func TestErrorPropagation(t *testing.T) {
 func TestSourceMapLoader(t *testing.T) {
 	vm := js.New()
 	r := NewRegistry(WithLoader(func(p string) ([]byte, error) {
-		switch p {
+		switch filepath.ToSlash(p) {
 		case "dir/m.js":
 			return []byte(`throw 'test passed';
 //# sourceMappingURL=m.js.map`), nil
@@ -529,6 +530,58 @@ func TestDefaultModuleLoader(t *testing.T) {
 			t.Fatalf("Unexpected Exception: %v", ex)
 		}
 	} else {
+		t.Fatal(err)
+	}
+}
+
+func TestDefaultPathResolver(t *testing.T) {
+	workdir, teardown, err := testsetup()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer teardown()
+
+	err = os.Chdir(workdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.Mkdir("node_modules", 0755)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.Mkdir("node_modules/a", 0755)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.Mkdir("node_modules/a/node_modules", 0755)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.Mkdir("node_modules/b", 0755)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.Symlink("../../b", "node_modules/a/node_modules/b")
+	if err != nil {
+		if runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(1314)) { // ERROR_PRIVILEGE_NOT_HELD
+			t.Skip("Creating symlinks on Windows requires admin privileges")
+		}
+		t.Fatal(err)
+	}
+
+	err = os.WriteFile("node_modules/b/index.js", []byte(``), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.WriteFile("node_modules/a/index.js", []byte(`require('b')`), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm := js.New()
+	r := NewRegistry()
+	rr := r.Enable(vm)
+	_, err = rr.Require("a")
+	if err != nil {
 		t.Fatal(err)
 	}
 }
