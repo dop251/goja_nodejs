@@ -13,7 +13,7 @@ runs:
       id: vars
       shell: bash
       run: |
-        echo "PKGS=\"buffer url\"" >> "${GITHUB_OUTPUT}"        
+        echo "PKGS=buffer url" >> "${GITHUB_OUTPUT}"        
 
     - name: Set versions
       shell: bash

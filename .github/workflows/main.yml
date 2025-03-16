@@ -63,7 +63,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
   publish-types-test:
-    needs: [ test, test-types ]
+    needs: [ test-types ]
     runs-on: ubuntu-latest
     if: "!startsWith(github.ref, 'refs/tags/v')"
     steps:
