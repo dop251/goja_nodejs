@@ -37,11 +37,11 @@ runs:
       shell: bash
       run: |
         cd global-types
-        npm publish
+        npm publish --access=public
         cd -
         for pkg in ${{ steps.vars.outputs.PKGS }}; do
           cd $pkg/types
-          npm publish
+          npm publish --access=public
           cd -
         done
       env:
