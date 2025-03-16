@@ -20,7 +20,7 @@ runs:
       run: |
         jq --arg version "${{ inputs.VERSION }}" '.version = $version' global-types/package.json > global-types/tmp.json && mv global-types/tmp.json global-types/package.json
         for pkg in ${{ steps.vars.outputs.PKGS }}; do
-          jq --arg version "${{ inputs.VERSION }}" '.version = $version' $pkg/package.json > $pkg/tmp.json && mv $pkg/tmp.json $pkg/package.json
+          jq --arg version "${{ inputs.VERSION }}" '.version = $version' $pkg/types/package.json > $pkg/types/tmp.json && mv $pkg/types/tmp.json $pkg/types/package.json
         done
     - name: Update dependency versions
       shell: bash
@@ -33,9 +33,11 @@ runs:
       run: |
         cd global-types
         npm publish
+        cd -
         for pkg in ${{ steps.vars.outputs.PKGS }}; do
-          cd ../$pkg/types
+          cd $pkg/types
           npm publish
+          cd -
         done
       env:
         NODE_AUTH_TOKEN: ${{ inputs.NODE_AUTH_TOKEN }}
