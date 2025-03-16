@@ -65,7 +65,7 @@ jobs:
   publish-types-test:
     needs: [ test, test-types ]
     runs-on: ubuntu-latest
-    if: !startsWith(github.ref, 'refs/tags/v')
+    if: "!startsWith(github.ref, 'refs/tags/v')"
     steps:
       - uses: actions/checkout@v4
       - name: Extract version
