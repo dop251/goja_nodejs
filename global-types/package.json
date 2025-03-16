@@ -1,6 +1,6 @@
 {
   "name": "@dop251/types-goja_nodejs-global",
-  "version": "0.0.1",
+  "version": "0.0.1-rc2",
   "types": "globals.d.ts",
   "scripts": {
     "test": "tsc --noEmit"
@@ -12,5 +12,5 @@
     "type": "git",
     "url": "git+https://github.com/dop251/goja_nodejs.git"
   },
-  "private": true
+  "private": false
 }

@@ -1,9 +1,9 @@
 {
-  "name": "@dop251/types-goja_nodejs-url",
+  "name": "@dop251/types-goja_nodejs-buffer",
   "version": "0.0.1-rc2",
-  "types": "url.d.ts",
+  "types": "buffer.d.ts",
   "scripts": {
-    "test": "tsc --noEmit"
+    "test": "tsc"
   },
   "repository": {
     "type": "git",

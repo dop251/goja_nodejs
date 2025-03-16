@@ -9,24 +9,33 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Set variables
+      id: vars
+      shell: bash
+      run: |
+        echo "PKGS=\"buffer url\"" >> "${GITHUB_OUTPUT}"        
+
     - name: Set versions
       shell: bash
       run: |
-        for pkg in global-types url/types; do
+        jq --arg version "${{ inputs.VERSION }}" '.version = $version' global-types/package.json > global-types/tmp.json && mv global-types/tmp.json global-types/package.json
+        for pkg in ${{ steps.vars.outputs.PKGS }}; do
           jq --arg version "${{ inputs.VERSION }}" '.version = $version' $pkg/package.json > $pkg/tmp.json && mv $pkg/tmp.json $pkg/package.json
         done
     - name: Update dependency versions
       shell: bash
       run: |
-        for pkg in url/types; do
-          jq --arg version "${{ inputs.VERSION }}" '.dependencies."@dop251/types-goja_nodejs-global" = $version' $pkg/package.json > $pkg/tmp.json && mv $pkg/tmp.json $pkg/package.json
+        for pkg in ${{ steps.vars.outputs.PKGS }}; do
+          jq --arg version "${{ inputs.VERSION }}" '.dependencies."@dop251/types-goja_nodejs-global" = $version' $pkg/types/package.json > $pkg/types/tmp.json && mv $pkg/types/tmp.json $pkg/types/package.json
         done
     - name: Publish the packages
       shell: bash
       run: |
         cd global-types
         npm publish
-        cd ../url/types
-        npm publish
+        for pkg in ${{ steps.vars.outputs.PKGS }}; do
+          cd ../$pkg/types
+          npm publish
+        done
       env:
         NODE_AUTH_TOKEN: ${{ inputs.NODE_AUTH_TOKEN }}

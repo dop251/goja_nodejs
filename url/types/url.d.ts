@@ -1,5 +1,4 @@
-import "@dop251/types-goja_nodejs-global";
-
+/// <reference types="@dop251/types-goja_nodejs-global" />
 declare module 'url' {
     /**
      * Returns the [Punycode](https://tools.ietf.org/html/rfc5891#section-4.4) ASCII serialization of the `domain`. If `domain` is an
@@ -537,4 +536,8 @@ declare module 'url' {
         values(): URLSearchParamsIterator<string>;
         [Symbol.iterator](): URLSearchParamsIterator<[string, string]>;
     }
+}
+
+declare module  "node:url" {
+    export * from "url";
 }

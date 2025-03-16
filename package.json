@@ -2,6 +2,7 @@
   "private": true,
   "workspaces": [
     "global-types",
-    "url/types"
+    "url/types",
+    "buffer/types"
   ]
 }
