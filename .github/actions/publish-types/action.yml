@@ -28,6 +28,11 @@ runs:
         for pkg in ${{ steps.vars.outputs.PKGS }}; do
           jq --arg version "${{ inputs.VERSION }}" '.dependencies."@dop251/types-goja_nodejs-global" = $version' $pkg/types/package.json > $pkg/types/tmp.json && mv $pkg/types/tmp.json $pkg/types/package.json
         done
+    - name: Setup nodejs
+      uses: actions/setup-node@v2
+      with:
+        node-version: '22'
+        registry-url: 'https://registry.npmjs.org'
     - name: Publish the packages
       shell: bash
       run: |
