@@ -25,7 +25,9 @@ function assertBufferWriteRead(buffer, writeMethod, readMethod, value, offset = 
 // getBufferElementSize determines the number of bytes per type based on method name
 function getBufferElementSize(methodName) {
     if (methodName.includes('64')) return 8;
+    if (methodName.includes('Double')) return 8;
     if (methodName.includes('32')) return 4;
+    if (methodName.includes('Float')) return 4;
     if (methodName.includes('16')) return 2;
     if (methodName.includes('8')) return 1;
     return 1;

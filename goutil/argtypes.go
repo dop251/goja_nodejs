@@ -1,15 +1,28 @@
 package goutil
 
 import (
+	"math/big"
+
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/errors"
-	"math/big"
 )
 
 func RequiredIntegerArgument(r *goja.Runtime, call goja.FunctionCall, name string, argIndex int) int64 {
 	arg := call.Argument(argIndex)
 	if goja.IsNumber(arg) {
 		return arg.ToInteger()
+	}
+	if goja.IsUndefined(arg) {
+		panic(errors.NewTypeError(r, errors.ErrCodeInvalidArgType, "The \"%s\" argument is required.", name))
+	}
+
+	panic(errors.NewArgumentNotNumberTypeError(r, name))
+}
+
+func RequiredFloatArgument(r *goja.Runtime, call goja.FunctionCall, name string, argIndex int) float64 {
+	arg := call.Argument(argIndex)
+	if goja.IsNumber(arg) {
+		return arg.ToFloat()
 	}
 	if goja.IsUndefined(arg) {
 		panic(errors.NewTypeError(r, errors.ErrCodeInvalidArgType, "The \"%s\" argument is required.", name))
