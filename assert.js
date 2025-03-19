@@ -2,13 +2,15 @@
 
 const assert = {
     _isSameValue(a, b) {
-        if (a === b) {
-            // Handle +/-0 vs. -/+0
-            return a !== 0 || 1 / a === 1 / b;
+        if (this._isNumber(a)) {
+            return this._numberEquals(a, b);
         }
-
-        // Handle NaN vs. NaN
-        return a !== a && b !== b;
+        
+        return a === b;
+    },
+    
+    _isNumber(val) {
+        return typeof val === "number";
     },
 
     _toString(value) {
@@ -25,6 +27,31 @@ const assert = {
 
             throw err;
         }
+    },
+    
+    _numberEquals(a, b, precision = 1e-6) {
+        if (!this._isNumber(b)) {
+            return false;
+        }
+        // Handle NaN vs. NaN
+        if (a !== a && b !== b) {
+            return true; // Both are NaN
+        }
+        // If only one is NaN, they're not equal
+        if (a !== a || b !== b) {
+            return false;
+        }
+        if (a === b) {
+            // Handle +/-0 vs. -/+0
+            return a !== 0 || 1 / a === 1 / b;
+        }
+        // Use relative error for larger numbers, absolute for smaller ones
+        if (Math.abs(a) > 1 || Math.abs(b) > 1) {
+            return Math.abs((a - b) / Math.max(Math.abs(a), Math.abs(b))) < precision;
+        }
+        
+        // Absolute error for small numbers
+        return Math.abs(a - b) < precision;
     },
 
     sameValue(actual, expected, message) {

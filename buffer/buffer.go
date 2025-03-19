@@ -718,6 +718,260 @@ func (b *Buffer) writeBigUInt64LE(call goja.FunctionCall) goja.Value {
 	return b.r.ToValue(offset + 8)
 }
 
+// writeDoubleBE writes a big-endian 64-bit double to the buffer
+func (b *Buffer) writeDoubleBE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredFloatArgument(b.r, call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 8)
+
+	bits := math.Float64bits(value)
+	binary.BigEndian.PutUint64(bb[offset:offset+8], bits)
+
+	return b.r.ToValue(offset + 8)
+}
+
+// writeDoubleLE writes a little-endian 64-bit double to the buffer
+func (b *Buffer) writeDoubleLE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredFloatArgument(b.r, call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 8)
+
+	bits := math.Float64bits(value)
+	binary.LittleEndian.PutUint64(bb[offset:offset+8], bits)
+
+	return b.r.ToValue(offset + 8)
+}
+
+// writeFloatBE writes a big-endian 32-bit float to the buffer
+func (b *Buffer) writeFloatBE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredFloatArgument(b.r, call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 4)
+
+	b.ensureWithinFloat32Range(value)
+
+	bits := math.Float32bits(float32(value))
+	binary.BigEndian.PutUint32(bb[offset:offset+4], bits)
+
+	return b.r.ToValue(offset + 4)
+}
+
+// writeFloatLE writes a little-endian 32-bit floating-point number to the buffer
+func (b *Buffer) writeFloatLE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredFloatArgument(b.r, call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 4)
+
+	b.ensureWithinFloat32Range(value)
+
+	bits := math.Float32bits(float32(value))
+	binary.LittleEndian.PutUint32(bb[offset:offset+4], bits)
+
+	return b.r.ToValue(offset + 4)
+}
+
+// writeInt8 writes an 8-bit signed integer to the buffer
+func (b *Buffer) writeInt8(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredIntegerArgument(b.r, call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 1)
+
+	if value < math.MinInt8 || value > math.MaxInt8 {
+		panic(errors.NewArgumentOutOfRangeError(b.r, "value", value))
+	}
+
+	bb[offset] = byte(int8(value))
+
+	return b.r.ToValue(offset + 1)
+}
+
+// writeInt16BE writes a big-endian 16-bit signed integer to the buffer
+func (b *Buffer) writeInt16BE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredIntegerArgument(b.r, call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 2)
+
+	b.ensureWithinInt16Range(value)
+
+	binary.BigEndian.PutUint16(bb[offset:offset+2], uint16(value))
+
+	return b.r.ToValue(offset + 2)
+}
+
+// writeInt16LE writes a little-endian 16-bit signed integer to the buffer
+func (b *Buffer) writeInt16LE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredIntegerArgument(b.r, call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 2)
+
+	b.ensureWithinInt16Range(value)
+
+	binary.LittleEndian.PutUint16(bb[offset:offset+2], uint16(value))
+
+	return b.r.ToValue(offset + 2)
+}
+
+// writeInt32BE writes a big-endian 32-bit signed integer to the buffer
+func (b *Buffer) writeInt32BE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredIntegerArgument(b.r, call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 4)
+
+	b.ensureWithinInt32Range(value)
+
+	binary.BigEndian.PutUint32(bb[offset:offset+4], uint32(value))
+
+	return b.r.ToValue(offset + 4)
+}
+
+// writeInt32LE writes a little-endian 32-bit signed integer to the buffer
+func (b *Buffer) writeInt32LE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredIntegerArgument(b.r, call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 4)
+
+	b.ensureWithinInt32Range(value)
+
+	binary.LittleEndian.PutUint32(bb[offset:offset+4], uint32(value))
+
+	return b.r.ToValue(offset + 4)
+}
+
+// writeIntBE writes a big-endian signed integer of variable byte length
+func (b *Buffer) writeIntBE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredIntegerArgument(b.r, call, "value", 0)
+	offset, byteLength := b.getVariableLengthWriteArguments(call, bb)
+
+	b.ensureWithinIntRange(byteLength, value)
+
+	// Write bytes in big-endian order (most significant byte first)
+	for i := int64(0); i < byteLength; i++ {
+		shift := uint(8 * (byteLength - 1 - i))
+		bb[offset+i] = byte(value >> shift)
+	}
+
+	return b.r.ToValue(offset + byteLength)
+}
+
+// writeIntLE writes a little-endian signed integer of variable byte length
+func (b *Buffer) writeIntLE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredIntegerArgument(b.r, call, "value", 0)
+	offset, byteLength := b.getVariableLengthWriteArguments(call, bb)
+
+	b.ensureWithinIntRange(byteLength, value)
+
+	// Write bytes in little-endian order
+	for i := int64(0); i < byteLength; i++ {
+		shift := uint(8 * i)
+		bb[offset+i] = byte(value >> shift)
+	}
+
+	return b.r.ToValue(offset + byteLength)
+}
+
+// writeUInt8 writes an 8-bit unsigned integer to the buffer
+func (b *Buffer) writeUInt8(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredIntegerArgument(b.r, call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 1)
+
+	if value < 0 || value > 255 {
+		panic(errors.NewArgumentOutOfRangeError(b.r, "value", value))
+	}
+
+	bb[offset] = uint8(value)
+
+	return b.r.ToValue(offset + 1)
+}
+
+// writeUInt16BE writes a big-endian 16-bit unsigned integer to the buffer
+func (b *Buffer) writeUInt16BE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredIntegerArgument(b.r, call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 2)
+
+	b.ensureWithinUInt16Range(value)
+
+	binary.BigEndian.PutUint16(bb[offset:offset+2], uint16(value))
+
+	return b.r.ToValue(offset + 2)
+}
+
+// writeUInt16LE writes a little-endian 16-bit unsigned integer to the buffer
+func (b *Buffer) writeUInt16LE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredIntegerArgument(b.r, call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 2)
+
+	b.ensureWithinUInt16Range(value)
+
+	binary.LittleEndian.PutUint16(bb[offset:offset+2], uint16(value))
+
+	return b.r.ToValue(offset + 2)
+}
+
+// writeUInt32BE writes a big-endian 32-bit unsigned integer to the buffer
+func (b *Buffer) writeUInt32BE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredIntegerArgument(b.r, call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 4)
+
+	b.ensureWithinUInt32Range(value)
+
+	binary.BigEndian.PutUint32(bb[offset:offset+4], uint32(value))
+
+	return b.r.ToValue(offset + 4)
+}
+
+// writeUInt32LE writes a little-endian 32-bit unsigned integer to the buffer
+func (b *Buffer) writeUInt32LE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredIntegerArgument(b.r, call, "value", 0)
+	offset := b.getOffsetArgument(call, 1, bb, 4)
+
+	b.ensureWithinUInt32Range(value)
+
+	binary.LittleEndian.PutUint32(bb[offset:offset+4], uint32(value))
+
+	return b.r.ToValue(offset + 4)
+}
+
+// writeUIntBE writes a big-endian unsigned integer of variable byte length
+func (b *Buffer) writeUIntBE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredIntegerArgument(b.r, call, "value", 0)
+	offset, byteLength := b.getVariableLengthWriteArguments(call, bb)
+
+	b.ensureWithinUIntRange(byteLength, value)
+
+	// Write the bytes in big-endian order (most significant byte first)
+	for i := int64(0); i < byteLength; i++ {
+		shift := (byteLength - 1 - i) * 8
+		bb[offset+i] = byte(value >> shift)
+	}
+
+	return b.r.ToValue(offset + byteLength)
+}
+
+// writeUIntLE writes a little-endian unsigned integer of variable byte length
+func (b *Buffer) writeUIntLE(call goja.FunctionCall) goja.Value {
+	bb := Bytes(b.r, call.This)
+	value := goutil.RequiredIntegerArgument(b.r, call, "value", 0)
+	offset, byteLength := b.getVariableLengthWriteArguments(call, bb)
+
+	b.ensureWithinUIntRange(byteLength, value)
+
+	// Write the bytes in little-endian order
+	for i := int64(0); i < byteLength; i++ {
+		shift := uint(8 * i)
+		bb[offset+i] = byte(value >> shift)
+	}
+
+	return b.r.ToValue(offset + byteLength)
+}
+
 func (b *Buffer) getOffsetArgument(call goja.FunctionCall, argIndex int, bb []byte, numBytes int64) int64 {
 	offset := goutil.OptionalIntegerArgument(b.r, call, "offset", argIndex, 0)
 
@@ -729,8 +983,16 @@ func (b *Buffer) getOffsetArgument(call goja.FunctionCall, argIndex int, bb []by
 }
 
 func (b *Buffer) getVariableLengthReadArguments(call goja.FunctionCall, bb []byte) (int64, int64) {
-	offset := goutil.RequiredIntegerArgument(b.r, call, "offset", 0)
-	byteLength := goutil.RequiredIntegerArgument(b.r, call, "byteLength", 1)
+	return b.getVariableLengthArguments(call, bb, 0, 1)
+}
+
+func (b *Buffer) getVariableLengthWriteArguments(call goja.FunctionCall, bb []byte) (int64, int64) {
+	return b.getVariableLengthArguments(call, bb, 1, 2)
+}
+
+func (b *Buffer) getVariableLengthArguments(call goja.FunctionCall, bb []byte, offsetArgIndex, byteLengthArgIndex int) (int64, int64) {
+	offset := goutil.RequiredIntegerArgument(b.r, call, "offset", offsetArgIndex)
+	byteLength := goutil.RequiredIntegerArgument(b.r, call, "byteLength", byteLengthArgIndex)
 
 	if byteLength < 1 || byteLength > 6 {
 		panic(errors.NewArgumentOutOfRangeError(b.r, "byteLength", byteLength))
@@ -740,6 +1002,61 @@ func (b *Buffer) getVariableLengthReadArguments(call goja.FunctionCall, bb []byt
 	}
 
 	return offset, byteLength
+}
+
+func (b *Buffer) ensureWithinFloat32Range(value float64) {
+	if value < -math.MaxFloat32 || value > math.MaxFloat32 {
+		panic(errors.NewArgumentOutOfRangeError(b.r, "value", value))
+	}
+}
+
+func (b *Buffer) ensureWithinInt16Range(value int64) {
+	if value < math.MinInt16 || value > math.MaxInt16 {
+		panic(errors.NewArgumentOutOfRangeError(b.r, "value", value))
+	}
+}
+
+func (b *Buffer) ensureWithinInt32Range(value int64) {
+	if value < math.MinInt32 || value > math.MaxInt32 {
+		panic(errors.NewArgumentOutOfRangeError(b.r, "value", value))
+	}
+}
+
+// ensureWithinIntRange checks to make sure that value is within the integer range
+// defined by the byteLength. Note that byteLength can be at most 6 bytes, so a
+// 48 bit integer is the largest possible value.
+func (b *Buffer) ensureWithinIntRange(byteLength, value int64) {
+	// Calculate the valid range for the given byte length
+	bits := byteLength * 8
+	minValue := -(int64(1) << (bits - 1))
+	maxValue := (int64(1) << (bits - 1)) - 1
+
+	if value < minValue || value > maxValue {
+		panic(errors.NewArgumentOutOfRangeError(b.r, "value", value))
+	}
+}
+
+func (b *Buffer) ensureWithinUInt16Range(value int64) {
+	if value < 0 || value > math.MaxUint16 {
+		panic(errors.NewArgumentOutOfRangeError(b.r, "value", value))
+	}
+}
+
+func (b *Buffer) ensureWithinUInt32Range(value int64) {
+	if value < 0 || value > math.MaxUint32 {
+		panic(errors.NewArgumentOutOfRangeError(b.r, "value", value))
+	}
+}
+
+// ensureWithinUIntRange checks to make sure that value is within the unsigned integer
+// range defined by the byteLength. Note that byteLength can be at most 6 bytes, so a
+// 48 bit unsigned integer is the largest possible value.
+func (b *Buffer) ensureWithinUIntRange(byteLength, value int64) {
+	// Validate that the value is within the valid range for the given byteLength
+	maxValue := (int64(1) << (8 * byteLength)) - 1
+	if value < 0 || value > maxValue {
+		panic(errors.NewArgumentOutOfRangeError(b.r, "value", value))
+	}
 }
 
 func signExtend(value int64, numBytes int64) int64 {
@@ -827,6 +1144,45 @@ func Require(runtime *goja.Runtime, module *goja.Object) {
 	proto.Set("writeBigUInt64LE", b.writeBigUInt64LE)
 	// aliases for writeBigUInt64LE
 	proto.Set("writeBigUint64LE", b.writeBigUInt64LE)
+
+	proto.Set("writeDoubleBE", b.writeDoubleBE)
+	proto.Set("writeDoubleLE", b.writeDoubleLE)
+	proto.Set("writeFloatBE", b.writeFloatBE)
+	proto.Set("writeFloatLE", b.writeFloatLE)
+	proto.Set("writeInt8", b.writeInt8)
+	proto.Set("writeInt16BE", b.writeInt16BE)
+	proto.Set("writeInt16LE", b.writeInt16LE)
+	proto.Set("writeInt32BE", b.writeInt32BE)
+	proto.Set("writeInt32LE", b.writeInt32LE)
+	proto.Set("writeIntBE", b.writeIntBE)
+	proto.Set("writeIntLE", b.writeIntLE)
+	proto.Set("writeUInt8", b.writeUInt8)
+	// aliases for writeUInt8
+	proto.Set("writeUint8", b.writeUInt8)
+
+	proto.Set("writeUInt16BE", b.writeUInt16BE)
+	// aliases for writeUInt16BE
+	proto.Set("writeUint16BE", b.writeUInt16BE)
+
+	proto.Set("writeUInt16LE", b.writeUInt16LE)
+	// aliases for writeUInt16LE
+	proto.Set("writeUint16LE", b.writeUInt16LE)
+
+	proto.Set("writeUInt32BE", b.writeUInt32BE)
+	// aliases for writeUInt32BE
+	proto.Set("writeUint32BE", b.writeUInt32BE)
+
+	proto.Set("writeUInt32LE", b.writeUInt32LE)
+	// aliases for writeUInt32LE
+	proto.Set("writeUint32LE", b.writeUInt32LE)
+
+	proto.Set("writeUIntBE", b.writeUIntBE)
+	// aliases for writeUIntBE
+	proto.Set("writeUintBE", b.writeUIntBE)
+
+	proto.Set("writeUIntLE", b.writeUIntLE)
+	// aliases for writeUIntLE
+	proto.Set("writeUintLE", b.writeUIntLE)
 
 	ctor.Set("prototype", proto)
 	ctor.Set("poolSize", 8192)

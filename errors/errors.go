@@ -92,6 +92,6 @@ func NewNotCorrectTypeError(r *goja.Runtime, name, _type string) *goja.Object {
 	return NewTypeError(r, ErrCodeInvalidArgType, "The \"%s\" argument must be of type %s.", name, _type)
 }
 
-func NewArgumentOutOfRangeError(r *goja.Runtime, name string, v int64) *goja.Object {
-	return NewRangeError(r, ErrCodeOutOfRange, "The value of \"%s\" %d is out of range.", name, v)
+func NewArgumentOutOfRangeError(r *goja.Runtime, name string, v any) *goja.Object {
+	return NewRangeError(r, ErrCodeOutOfRange, "The value of \"%s\" %v is out of range.", name, v)
 }
