@@ -283,7 +283,6 @@ declare module 'buffer' {
              * @return `offset` plus the number of bytes written.
              */
             writeBigInt64BE(value: bigint, offset?: number): number;
-
             /**
              * Writes `value` to `buf` at the specified `offset` as little-endian.
              *
@@ -305,7 +304,6 @@ declare module 'buffer' {
              * @return `offset` plus the number of bytes written.
              */
             writeBigInt64LE(value: bigint, offset?: number): number;
-
             /**
              * Writes `value` to `buf` at the specified `offset` as big-endian.
              *
@@ -327,13 +325,11 @@ declare module 'buffer' {
              * @return `offset` plus the number of bytes written.
              */
             writeBigUInt64BE(value: bigint, offset?: number): number;
-
             /**
              * @alias Buffer.writeBigUInt64BE
              * @since v14.10.0, v12.19.0
              */
             writeBigUint64BE(value: bigint, offset?: number): number;
-
             /**
              * Writes `value` to `buf` at the specified `offset` as little-endian
              *
@@ -355,13 +351,109 @@ declare module 'buffer' {
              * @return `offset` plus the number of bytes written.
              */
             writeBigUInt64LE(value: bigint, offset?: number): number;
-
             /**
              * @alias Buffer.writeBigUInt64LE
              * @since v14.10.0, v12.19.0
              */
             writeBigUint64LE(value: bigint, offset?: number): number;
-
+            /**
+             * Writes `byteLength` bytes of `value` to `buf` at the specified `offset`as little-endian. Supports up to 48 bits of accuracy. Behavior is undefined
+             * when `value` is anything other than an unsigned integer.
+             *
+             * This function is also available under the `writeUintLE` alias.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(6);
+             *
+             * buf.writeUIntLE(0x1234567890ab, 0, 6);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer ab 90 78 56 34 12>
+             * ```
+             * @since v0.5.5
+             * @param value Number to be written to `buf`.
+             * @param offset Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - byteLength`.
+             * @param byteLength Number of bytes to write. Must satisfy `0 < byteLength <= 6`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeUIntLE(value: number, offset: number, byteLength: number): number;
+            /**
+             * @alias Buffer.writeUIntLE
+             * @since v14.9.0, v12.19.0
+             */
+            writeUintLE(value: number, offset: number, byteLength: number): number;
+            /**
+             * Writes `byteLength` bytes of `value` to `buf` at the specified `offset`as big-endian. Supports up to 48 bits of accuracy. Behavior is undefined
+             * when `value` is anything other than an unsigned integer.
+             *
+             * This function is also available under the `writeUintBE` alias.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(6);
+             *
+             * buf.writeUIntBE(0x1234567890ab, 0, 6);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer 12 34 56 78 90 ab>
+             * ```
+             * @since v0.5.5
+             * @param value Number to be written to `buf`.
+             * @param offset Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - byteLength`.
+             * @param byteLength Number of bytes to write. Must satisfy `0 < byteLength <= 6`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeUIntBE(value: number, offset: number, byteLength: number): number;
+            /**
+             * @alias Buffer.writeUIntBE
+             * @since v14.9.0, v12.19.0
+             */
+            writeUintBE(value: number, offset: number, byteLength: number): number;
+            /**
+             * Writes `byteLength` bytes of `value` to `buf` at the specified `offset`as little-endian. Supports up to 48 bits of accuracy. Behavior is undefined
+             * when `value` is anything other than a signed integer.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(6);
+             *
+             * buf.writeIntLE(0x1234567890ab, 0, 6);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer ab 90 78 56 34 12>
+             * ```
+             * @since v0.11.15
+             * @param value Number to be written to `buf`.
+             * @param offset Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - byteLength`.
+             * @param byteLength Number of bytes to write. Must satisfy `0 < byteLength <= 6`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeIntLE(value: number, offset: number, byteLength: number): number;
+            /**
+             * Writes `byteLength` bytes of `value` to `buf` at the specified `offset`as big-endian. Supports up to 48 bits of accuracy. Behavior is undefined when`value` is anything other than a
+             * signed integer.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(6);
+             *
+             * buf.writeIntBE(0x1234567890ab, 0, 6);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer 12 34 56 78 90 ab>
+             * ```
+             * @since v0.11.15
+             * @param value Number to be written to `buf`.
+             * @param offset Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - byteLength`.
+             * @param byteLength Number of bytes to write. Must satisfy `0 < byteLength <= 6`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeIntBE(value: number, offset: number, byteLength: number): number;
             /**
              * Reads an unsigned, big-endian 64-bit integer from `buf` at the specified`offset`.
              *
@@ -821,6 +913,400 @@ declare module 'buffer' {
              * @param [offset=0] Number of bytes to skip before starting to read. Must satisfy `0 <= offset <= buf.length - 8`.
              */
             readDoubleBE(offset?: number): number;
+
+            /**
+             * Writes `value` to `buf` at the specified `offset`. `value` must be a
+             * valid unsigned 8-bit integer. Behavior is undefined when `value` is anything
+             * other than an unsigned 8-bit integer.
+             *
+             * This function is also available under the `writeUint8` alias.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(4);
+             *
+             * buf.writeUInt8(0x3, 0);
+             * buf.writeUInt8(0x4, 1);
+             * buf.writeUInt8(0x23, 2);
+             * buf.writeUInt8(0x42, 3);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer 03 04 23 42>
+             * ```
+             * @since v0.5.0
+             * @param value Number to be written to `buf`.
+             * @param [offset=0] Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - 1`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeUInt8(value: number, offset?: number): number;
+            /**
+             * @alias Buffer.writeUInt8
+             * @since v14.9.0, v12.19.0
+             */
+            writeUint8(value: number, offset?: number): number;
+            /**
+             * Writes `value` to `buf` at the specified `offset` as little-endian. The `value` must be a valid unsigned 16-bit integer. Behavior is undefined when `value` is
+             * anything other than an unsigned 16-bit integer.
+             *
+             * This function is also available under the `writeUint16LE` alias.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(4);
+             *
+             * buf.writeUInt16LE(0xdead, 0);
+             * buf.writeUInt16LE(0xbeef, 2);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer ad de ef be>
+             * ```
+             * @since v0.5.5
+             * @param value Number to be written to `buf`.
+             * @param [offset=0] Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - 2`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeUInt16LE(value: number, offset?: number): number;
+            /**
+             * @alias Buffer.writeUInt16LE
+             * @since v14.9.0, v12.19.0
+             */
+            writeUint16LE(value: number, offset?: number): number;
+            /**
+             * Writes `value` to `buf` at the specified `offset` as big-endian. The `value` must be a valid unsigned 16-bit integer. Behavior is undefined when `value`is anything other than an
+             * unsigned 16-bit integer.
+             *
+             * This function is also available under the `writeUint16BE` alias.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(4);
+             *
+             * buf.writeUInt16BE(0xdead, 0);
+             * buf.writeUInt16BE(0xbeef, 2);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer de ad be ef>
+             * ```
+             * @since v0.5.5
+             * @param value Number to be written to `buf`.
+             * @param [offset=0] Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - 2`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeUInt16BE(value: number, offset?: number): number;
+            /**
+             * @alias Buffer.writeUInt16BE
+             * @since v14.9.0, v12.19.0
+             */
+            writeUint16BE(value: number, offset?: number): number;
+            /**
+             * Writes `value` to `buf` at the specified `offset` as little-endian. The `value` must be a valid unsigned 32-bit integer. Behavior is undefined when `value` is
+             * anything other than an unsigned 32-bit integer.
+             *
+             * This function is also available under the `writeUint32LE` alias.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(4);
+             *
+             * buf.writeUInt32LE(0xfeedface, 0);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer ce fa ed fe>
+             * ```
+             * @since v0.5.5
+             * @param value Number to be written to `buf`.
+             * @param [offset=0] Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - 4`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeUInt32LE(value: number, offset?: number): number;
+            /**
+             * @alias Buffer.writeUInt32LE
+             * @since v14.9.0, v12.19.0
+             */
+            writeUint32LE(value: number, offset?: number): number;
+            /**
+             * Writes `value` to `buf` at the specified `offset` as big-endian. The `value` must be a valid unsigned 32-bit integer. Behavior is undefined when `value`is anything other than an
+             * unsigned 32-bit integer.
+             *
+             * This function is also available under the `writeUint32BE` alias.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(4);
+             *
+             * buf.writeUInt32BE(0xfeedface, 0);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer fe ed fa ce>
+             * ```
+             * @since v0.5.5
+             * @param value Number to be written to `buf`.
+             * @param [offset=0] Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - 4`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeUInt32BE(value: number, offset?: number): number;
+            /**
+             * @alias Buffer.writeUInt32BE
+             * @since v14.9.0, v12.19.0
+             */
+            writeUint32BE(value: number, offset?: number): number;
+            /**
+             * Writes `value` to `buf` at the specified `offset`. `value` must be a valid
+             * signed 8-bit integer. Behavior is undefined when `value` is anything other than
+             * a signed 8-bit integer.
+             *
+             * `value` is interpreted and written as a two's complement signed integer.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(2);
+             *
+             * buf.writeInt8(2, 0);
+             * buf.writeInt8(-2, 1);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer 02 fe>
+             * ```
+             * @since v0.5.0
+             * @param value Number to be written to `buf`.
+             * @param [offset=0] Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - 1`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeInt8(value: number, offset?: number): number;
+            /**
+             * Writes `value` to `buf` at the specified `offset` as little-endian.  The `value` must be a valid signed 16-bit integer. Behavior is undefined when `value` is
+             * anything other than a signed 16-bit integer.
+             *
+             * The `value` is interpreted and written as a two's complement signed integer.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(2);
+             *
+             * buf.writeInt16LE(0x0304, 0);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer 04 03>
+             * ```
+             * @since v0.5.5
+             * @param value Number to be written to `buf`.
+             * @param [offset=0] Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - 2`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeInt16LE(value: number, offset?: number): number;
+            /**
+             * Writes `value` to `buf` at the specified `offset` as big-endian.  The `value` must be a valid signed 16-bit integer. Behavior is undefined when `value` is
+             * anything other than a signed 16-bit integer.
+             *
+             * The `value` is interpreted and written as a two's complement signed integer.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(2);
+             *
+             * buf.writeInt16BE(0x0102, 0);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer 01 02>
+             * ```
+             * @since v0.5.5
+             * @param value Number to be written to `buf`.
+             * @param [offset=0] Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - 2`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeInt16BE(value: number, offset?: number): number;
+            /**
+             * Writes `value` to `buf` at the specified `offset` as little-endian. The `value` must be a valid signed 32-bit integer. Behavior is undefined when `value` is
+             * anything other than a signed 32-bit integer.
+             *
+             * The `value` is interpreted and written as a two's complement signed integer.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(4);
+             *
+             * buf.writeInt32LE(0x05060708, 0);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer 08 07 06 05>
+             * ```
+             * @since v0.5.5
+             * @param value Number to be written to `buf`.
+             * @param [offset=0] Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - 4`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeInt32LE(value: number, offset?: number): number;
+            /**
+             * Writes `value` to `buf` at the specified `offset` as big-endian. The `value` must be a valid signed 32-bit integer. Behavior is undefined when `value` is
+             * anything other than a signed 32-bit integer.
+             *
+             * The `value` is interpreted and written as a two's complement signed integer.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(4);
+             *
+             * buf.writeInt32BE(0x01020304, 0);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer 01 02 03 04>
+             * ```
+             * @since v0.5.5
+             * @param value Number to be written to `buf`.
+             * @param [offset=0] Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - 4`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeInt32BE(value: number, offset?: number): number;
+            /**
+             * Writes `value` to `buf` at the specified `offset` as little-endian. Behavior is
+             * undefined when `value` is anything other than a JavaScript number.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(4);
+             *
+             * buf.writeFloatLE(0xcafebabe, 0);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer bb fe 4a 4f>
+             * ```
+             * @since v0.11.15
+             * @param value Number to be written to `buf`.
+             * @param [offset=0] Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - 4`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeFloatLE(value: number, offset?: number): number;
+            /**
+             * Writes `value` to `buf` at the specified `offset` as big-endian. Behavior is
+             * undefined when `value` is anything other than a JavaScript number.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(4);
+             *
+             * buf.writeFloatBE(0xcafebabe, 0);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer 4f 4a fe bb>
+             * ```
+             * @since v0.11.15
+             * @param value Number to be written to `buf`.
+             * @param [offset=0] Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - 4`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeFloatBE(value: number, offset?: number): number;
+            /**
+             * Writes `value` to `buf` at the specified `offset` as little-endian. The `value` must be a JavaScript number. Behavior is undefined when `value` is anything
+             * other than a JavaScript number.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(8);
+             *
+             * buf.writeDoubleLE(123.456, 0);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer 77 be 9f 1a 2f dd 5e 40>
+             * ```
+             * @since v0.11.15
+             * @param value Number to be written to `buf`.
+             * @param [offset=0] Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - 8`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeDoubleLE(value: number, offset?: number): number;
+            /**
+             * Writes `value` to `buf` at the specified `offset` as big-endian. The `value` must be a JavaScript number. Behavior is undefined when `value` is anything
+             * other than a JavaScript number.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(8);
+             *
+             * buf.writeDoubleBE(123.456, 0);
+             *
+             * console.log(buf);
+             * // Prints: <Buffer 40 5e dd 2f 1a 9f be 77>
+             * ```
+             * @since v0.11.15
+             * @param value Number to be written to `buf`.
+             * @param [offset=0] Number of bytes to skip before starting to write. Must satisfy `0 <= offset <= buf.length - 8`.
+             * @return `offset` plus the number of bytes written.
+             */
+            writeDoubleBE(value: number, offset?: number): number;
+            /**
+             * Fills `buf` with the specified `value`. If the `offset` and `end` are not given,
+             * the entire `buf` will be filled:
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * // Fill a `Buffer` with the ASCII character 'h'.
+             *
+             * const b = Buffer.allocUnsafe(50).fill('h');
+             *
+             * console.log(b.toString());
+             * // Prints: hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+             *
+             * // Fill a buffer with empty string
+             * const c = Buffer.allocUnsafe(5).fill('');
+             *
+             * console.log(c.fill(''));
+             * // Prints: <Buffer 00 00 00 00 00>
+             * ```
+             *
+             * `value` is coerced to a `uint32` value if it is not a string, `Buffer`, or
+             * integer. If the resulting integer is greater than `255` (decimal), `buf` will be
+             * filled with `value &#x26; 255`.
+             *
+             * If the final write of a `fill()` operation falls on a multi-byte character,
+             * then only the bytes of that character that fit into `buf` are written:
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * // Fill a `Buffer` with character that takes up two bytes in UTF-8.
+             *
+             * console.log(Buffer.allocUnsafe(5).fill('\u0222'));
+             * // Prints: <Buffer c8 a2 c8 a2 c8>
+             * ```
+             *
+             * If `value` contains invalid characters, it is truncated; if no valid
+             * fill data remains, an exception is thrown:
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * const buf = Buffer.allocUnsafe(5);
+             *
+             * console.log(buf.fill('a'));
+             * // Prints: <Buffer 61 61 61 61 61>
+             * console.log(buf.fill('aazz', 'hex'));
+             * // Prints: <Buffer aa aa aa aa aa>
+             * console.log(buf.fill('zz', 'hex'));
+             * // Throws an exception.
+             * ```
+             * @since v0.5.0
+             * @param value The value with which to fill `buf`. Empty value (string, Uint8Array, Buffer) is coerced to `0`.
+             * @param [offset=0] Number of bytes to skip before starting to fill `buf`.
+             * @param [end=buf.length] Where to stop filling `buf` (not inclusive).
+             * @param [encoding='utf8'] The encoding for `value` if `value` is a string.
+             * @return A reference to `buf`.
+             */
+
         }
 
         var Buffer: BufferConstructor;
