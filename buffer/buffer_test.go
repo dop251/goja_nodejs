@@ -1720,3 +1720,711 @@ func TestBuffer_writeBigUInt64LE(t *testing.T) {
 
 	runTestCases(t, tcs)
 }
+
+func TestBuffer_writeDoubleBE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(8);
+				assert.throwsNodeErrorWithMessage(() => buf.writeDoubleBE(123.456, 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 1 is out of range.');
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(24);
+				buf.writeDoubleBE(123.1);    // default offset of zero
+				buf.writeDoubleBE(456.4, 8);
+				buf.writeDoubleBE(789.7, 16);
+				
+				assertValueRead(buf.readDoubleBE(0), 123.1);
+				assertValueRead(buf.readDoubleBE(8), 456.4);
+				assertValueRead(buf.readDoubleBE(16), 789.7);
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeDoubleLE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(8);
+				assert.throwsNodeErrorWithMessage(() => buf.writeDoubleLE(123.456, 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 1 is out of range.');
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(24);
+				buf.writeDoubleLE(123.1);    // default offset of zero
+				buf.writeDoubleLE(456.4, 8);
+				buf.writeDoubleLE(789.7, 16);
+				
+				assertValueRead(buf.readDoubleLE(0), 123.1);
+				assertValueRead(buf.readDoubleLE(8), 456.4);
+				assertValueRead(buf.readDoubleLE(16), 789.7);
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeFloatBE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(4);
+				assert.throwsNodeErrorWithMessage(() => buf.writeFloatBE(123.456, 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 1 is out of range.');
+            `,
+		},
+		{
+			name: "number exceeds ranges",
+			script: `
+				const buf = Buffer.alloc(4);
+				// above the max
+				assert.throwsNodeErrorWithMessage(() => buf.writeFloatBE(3.5e+38, 0, 6), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 3.5e+38 is out of range.');
+				// below the min
+				assert.throwsNodeErrorWithMessage(() => buf.writeFloatBE(-3.5e+38, 0, 6), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -3.5e+38 is out of range.');
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(12);
+				buf.writeFloatBE(123.1);    // default offset of zero
+				buf.writeFloatBE(456.4, 4);
+				buf.writeFloatBE(789.7, 8);
+				
+				assertValueRead(buf.readFloatBE(0), 123.1);
+				assertValueRead(buf.readFloatBE(4), 456.4);
+				assertValueRead(buf.readFloatBE(8), 789.7);
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeFloatLE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(4);
+				assert.throwsNodeErrorWithMessage(() => buf.writeFloatLE(123.456, 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 1 is out of range.');
+            `,
+		},
+		{
+			name: "number exceeds ranges",
+			script: `
+				const buf = Buffer.alloc(4);
+				// above the max
+				assert.throwsNodeErrorWithMessage(() => buf.writeFloatLE(3.5e+38, 0, 6), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 3.5e+38 is out of range.');
+				// below the min
+				assert.throwsNodeErrorWithMessage(() => buf.writeFloatLE(-3.5e+38, 0, 6), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -3.5e+38 is out of range.');
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(12);
+				buf.writeFloatLE(123.1);    // default offset of zero
+				buf.writeFloatLE(456.4, 4);
+				buf.writeFloatLE(789.7, 8);
+				
+				assertValueRead(buf.readFloatLE(0), 123.1);
+				assertValueRead(buf.readFloatLE(4), 456.4);
+				assertValueRead(buf.readFloatLE(8), 789.7);
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeInt8(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(2);
+				assert.throwsNodeErrorWithMessage(() => buf.writeInt8(2, 2), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 2 is out of range.');
+            `,
+		},
+		{
+			name: "number exceeds ranges",
+			script: `
+				const buf = Buffer.alloc(4);
+				// above the max
+				assert.throwsNodeErrorWithMessage(() => buf.writeInt8(128), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 128 is out of range.');
+				// below the min
+				assert.throwsNodeErrorWithMessage(() => buf.writeInt8(-129), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -129 is out of range.');
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(3);
+				buf.writeInt8(3);    // default offset of zero
+				buf.writeInt8(2, 1);
+				buf.writeInt8(1, 2);
+				
+				assertValueRead(buf.readInt8(0), 3);
+				assertValueRead(buf.readInt8(1), 2);
+				assertValueRead(buf.readInt8(2), 1);
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeInt16BE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(2);
+				assert.throwsNodeErrorWithMessage(() => buf.writeInt16BE(2, 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 1 is out of range.');
+            `,
+		},
+		{
+			name: "number exceeds ranges",
+			script: `
+				const buf = Buffer.alloc(4);
+				// above the max
+				assert.throwsNodeErrorWithMessage(() => buf.writeInt16BE(32768), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 32768 is out of range.');
+				// below the min
+				assert.throwsNodeErrorWithMessage(() => buf.writeInt16BE(-32769), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -32769 is out of range.');
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(6);
+				buf.writeInt16BE(3);    // default offset of zero
+				buf.writeInt16BE(2, 2);
+				buf.writeInt16BE(1, 4);
+				
+				assertValueRead(buf.readInt16BE(0), 3);
+				assertValueRead(buf.readInt16BE(2), 2);
+				assertValueRead(buf.readInt16BE(4), 1);
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeInt16LE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(2);
+				assert.throwsNodeErrorWithMessage(() => buf.writeInt16LE(2, 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 1 is out of range.');
+            `,
+		},
+		{
+			name: "number exceeds ranges",
+			script: `
+				const buf = Buffer.alloc(4);
+				// above the max
+				assert.throwsNodeErrorWithMessage(() => buf.writeInt16LE(32768), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 32768 is out of range.');
+				// below the min
+				assert.throwsNodeErrorWithMessage(() => buf.writeInt16LE(-32769), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -32769 is out of range.');
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(6);
+				buf.writeInt16LE(3);    // default offset of zero
+				buf.writeInt16LE(2, 2);
+				buf.writeInt16LE(1, 4);
+				
+				assertValueRead(buf.readInt16LE(0), 3);
+				assertValueRead(buf.readInt16LE(2), 2);
+				assertValueRead(buf.readInt16LE(4), 1);
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeInt32BE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(4);
+				assert.throwsNodeErrorWithMessage(() => buf.writeInt32BE(2, 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 1 is out of range.');
+            `,
+		},
+		{
+			name: "number exceeds ranges",
+			script: `
+				const buf = Buffer.alloc(4);
+				// above the max
+				assert.throwsNodeErrorWithMessage(() => buf.writeInt32BE(2147483648), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 2147483648 is out of range.');
+				// below the min
+				assert.throwsNodeErrorWithMessage(() => buf.writeInt32BE(-2147483649), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -2147483649 is out of range.');
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(12);
+				buf.writeInt32BE(3);    // default offset of zero
+				buf.writeInt32BE(2, 4);
+				buf.writeInt32BE(1, 8);
+				
+				assertValueRead(buf.readInt32BE(0), 3);
+				assertValueRead(buf.readInt32BE(4), 2);
+				assertValueRead(buf.readInt32BE(8), 1);
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeInt32LE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(4);
+				assert.throwsNodeErrorWithMessage(() => buf.writeInt32LE(2, 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 1 is out of range.');
+            `,
+		},
+		{
+			name: "number exceeds ranges",
+			script: `
+				const buf = Buffer.alloc(4);
+				// above the max
+				assert.throwsNodeErrorWithMessage(() => buf.writeInt32LE(2147483648), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 2147483648 is out of range.');
+				// below the min
+				assert.throwsNodeErrorWithMessage(() => buf.writeInt32LE(-2147483649), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -2147483649 is out of range.');
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(12);
+				buf.writeInt32LE(3);    // default offset of zero
+				buf.writeInt32LE(2, 4);
+				buf.writeInt32LE(1, 8);
+				
+				assertValueRead(buf.readInt32LE(0), 3);
+				assertValueRead(buf.readInt32LE(4), 2);
+				assertValueRead(buf.readInt32LE(8), 1);
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeIntBE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write out of range offset",
+			script: `
+				const buf = Buffer.alloc(6);
+				assert.throwsNodeErrorWithMessage(() => buf.writeIntBE(127, 6, 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 6 is out of range.');
+            `,
+		},
+		{
+			name: "byteLength out of range",
+			script: `
+				const buf = Buffer.alloc(6);
+				
+				// above the max
+				assert.throwsNodeErrorWithMessage(() => buf.writeIntBE(0, 0, 7), RangeError, "ERR_OUT_OF_RANGE", 'The value of "byteLength" 7 is out of range.');
+				// below the min
+				assert.throwsNodeErrorWithMessage(() => buf.writeIntBE(0, 0, 0), RangeError, "ERR_OUT_OF_RANGE", 'The value of "byteLength" 0 is out of range.');
+            `,
+		},
+		{
+			name: "number exceeds ranges",
+			script: `
+				const buf = Buffer.alloc(6);
+				// above the 6-byte max
+				assert.throwsNodeErrorWithMessage(() => buf.writeIntBE(140737488355328, 0, 6), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 140737488355328 is out of range.');
+				// below the 6-byte min
+				assert.throwsNodeErrorWithMessage(() => buf.writeIntBE(-140737488355329, 0, 6), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -140737488355329 is out of range.');
+				// above the 2-byte max
+				assert.throwsNodeErrorWithMessage(() => buf.writeIntBE(32768, 0, 2), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 32768 is out of range.');
+				// below the 2-byte min
+				assert.throwsNodeErrorWithMessage(() => buf.writeIntBE(-32769, 0, 2), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -32769 is out of range.');
+            `,
+		},
+		{
+			name: "writing and reading with different byte lengths",
+			script: `
+				const buf = Buffer.alloc(6);
+				buf.writeIntBE(-1, 0, 1);       // 1 byte
+				buf.writeIntBE(256, 1, 2);      // 2 bytes
+				buf.writeIntBE(97328, 3, 3);    // 3 bytes
+				
+				assertValueRead(buf.readIntBE(0, 1), -1);
+				assertValueRead(buf.toString('hex', 0, 1), "ff");
+				assertValueRead(buf.readIntBE(1, 2), 256);
+				assertValueRead(buf.toString('hex', 1, 3), "0100");
+				assertValueRead(buf.readIntBE(3, 3), 97328);
+				assertValueRead(buf.toString('hex', 3, 6), "017c30");
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeIntLE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write out of range offset",
+			script: `
+				const buf = Buffer.alloc(6);
+				assert.throwsNodeErrorWithMessage(() => buf.writeIntLE(127, 6, 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 6 is out of range.');
+            `,
+		},
+		{
+			name: "byteLength out of range",
+			script: `
+				const buf = Buffer.alloc(6);
+				
+				// above the max
+				assert.throwsNodeErrorWithMessage(() => buf.writeIntLE(0, 0, 7), RangeError, "ERR_OUT_OF_RANGE", 'The value of "byteLength" 7 is out of range.');
+				// below the min
+				assert.throwsNodeErrorWithMessage(() => buf.writeIntLE(0, 0, 0), RangeError, "ERR_OUT_OF_RANGE", 'The value of "byteLength" 0 is out of range.');
+            `,
+		},
+		{
+			name: "number exceeds ranges",
+			script: `
+				const buf = Buffer.alloc(6);
+				// above the 6-byte max
+				assert.throwsNodeErrorWithMessage(() => buf.writeIntLE(140737488355328, 0, 6), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 140737488355328 is out of range.');
+				// below the 6-byte min
+				assert.throwsNodeErrorWithMessage(() => buf.writeIntLE(-140737488355329, 0, 6), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -140737488355329 is out of range.');
+				// above the 2-byte max
+				assert.throwsNodeErrorWithMessage(() => buf.writeIntLE(32768, 0, 2), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 32768 is out of range.');
+				// below the 2-byte min
+				assert.throwsNodeErrorWithMessage(() => buf.writeIntLE(-32769, 0, 2), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -32769 is out of range.');
+            `,
+		},
+		{
+			name: "writing and reading with different byte lengths",
+			script: `
+				const buf = Buffer.alloc(6);
+				buf.writeIntLE(-1, 0, 1);       // 1 byte
+				buf.writeIntLE(256, 1, 2);      // 2 bytes
+				buf.writeIntLE(97328, 3, 3);    // 3 bytes
+				
+				assertValueRead(buf.readIntLE(0, 1), -1);
+				assertValueRead(buf.toString('hex', 0, 1), "ff");
+				assertValueRead(buf.readIntLE(1, 2), 256);
+				assertValueRead(buf.toString('hex', 1, 3), "0001");
+				assertValueRead(buf.readIntLE(3, 3), 97328);
+				assertValueRead(buf.toString('hex', 3, 6), "307c01");
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeUInt8(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(2);
+				assert.throwsNodeErrorWithMessage(() => buf.writeUInt8(2, 2), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 2 is out of range.');
+            `,
+		},
+		{
+			name: "number exceeds ranges",
+			script: `
+				const buf = Buffer.alloc(2);
+				assert.throwsNodeErrorWithMessage(() => buf.writeUInt8(256), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 256 is out of range.');
+				assert.throwsNodeErrorWithMessage(() => buf.writeUInt8(256), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 256 is out of range.');
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(3);
+				buf.writeUInt8(3);    // default offset of zero
+				buf.writeUint8(2, 1); // using alias
+				buf.writeUInt8(1, 2);
+				
+				assertValueRead(buf.readUInt8(0), 3);
+				assertValueRead(buf.readUInt8(1), 2);
+				assertValueRead(buf.readUInt8(2), 1);
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeUInt16BE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(2);
+				assert.throwsNodeErrorWithMessage(() => buf.writeUInt16BE(2, 2), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 2 is out of range.');
+            `,
+		},
+		{
+			name: "number exceeds ranges",
+			script: `
+				const buf = Buffer.alloc(2);
+				assert.throwsNodeErrorWithMessage(() => buf.writeUInt16BE(65536), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 65536 is out of range.');
+				assert.throwsNodeErrorWithMessage(() => buf.writeUInt16BE(-1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -1 is out of range.');
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(6);
+				buf.writeUInt16BE(3);    // default offset of zero
+				buf.writeUInt16BE(2, 2); // using method alias
+				buf.writeUInt16BE(1, 4);
+				
+				assertValueRead(buf.readUInt16BE(0), 3);
+				assertValueRead(buf.readUInt16BE(2), 2);
+				assertValueRead(buf.readUInt16BE(4), 1);
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeUInt16LE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(2);
+				assert.throwsNodeErrorWithMessage(() => buf.writeUInt16LE(2, 2), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 2 is out of range.');
+            `,
+		},
+		{
+			name: "number exceeds ranges",
+			script: `
+				const buf = Buffer.alloc(2);
+				assert.throwsNodeErrorWithMessage(() => buf.writeUInt16LE(65536), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 65536 is out of range.');
+				assert.throwsNodeErrorWithMessage(() => buf.writeUInt16LE(-1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -1 is out of range.');
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(6);
+				buf.writeUInt16LE(3);    // default offset of zero
+				buf.writeUint16LE(2, 2); // using method alias
+				buf.writeUInt16LE(1, 4);
+				
+				assertValueRead(buf.readUInt16LE(0), 3);
+				assertValueRead(buf.readUInt16LE(2), 2);
+				assertValueRead(buf.readUInt16LE(4), 1);
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeUInt32BE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(4);
+				assert.throwsNodeErrorWithMessage(() => buf.writeUInt32BE(2, 2), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 2 is out of range.');
+            `,
+		},
+		{
+			name: "number exceeds ranges",
+			script: `
+				const buf = Buffer.alloc(4);
+				assert.throwsNodeErrorWithMessage(() => buf.writeUInt32BE(4294967296), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 4294967296 is out of range.');
+				assert.throwsNodeErrorWithMessage(() => buf.writeUInt32BE(-1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -1 is out of range.');
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(12);
+				buf.writeUInt32BE(3);    // default offset of zero
+				buf.writeUint32BE(2, 4); // using method alias
+				buf.writeUInt32BE(1, 8);
+				
+				assertValueRead(buf.readUInt32BE(0), 3);
+				assertValueRead(buf.readUInt32BE(4), 2);
+				assertValueRead(buf.readUInt32BE(8), 1);
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeUInt32LE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write with out of range offset",
+			script: `
+				const buf = Buffer.alloc(4);
+				assert.throwsNodeErrorWithMessage(() => buf.writeUInt32LE(2, 2), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 2 is out of range.');
+            `,
+		},
+		{
+			name: "number exceeds ranges",
+			script: `
+				const buf = Buffer.alloc(4);
+				assert.throwsNodeErrorWithMessage(() => buf.writeUInt32LE(4294967296), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 4294967296 is out of range.');
+				assert.throwsNodeErrorWithMessage(() => buf.writeUInt32LE(-1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -1 is out of range.');
+            `,
+		},
+		{
+			name: "writing and then reading different sections of buffer",
+			script: `
+				const buf = Buffer.alloc(12);
+				buf.writeUInt32LE(3);    // default offset of zero
+				buf.writeUInt32LE(2, 4); // using method alias
+				buf.writeUInt32LE(1, 8);
+				
+				assertValueRead(buf.readUInt32LE(0), 3);
+				assertValueRead(buf.readUInt32LE(4), 2);
+				assertValueRead(buf.readUInt32LE(8), 1);
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeUIntBE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write out of range offset",
+			script: `
+				const buf = Buffer.alloc(6);
+				assert.throwsNodeErrorWithMessage(() => buf.writeUIntBE(127, 6, 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 6 is out of range.');
+            `,
+		},
+		{
+			name: "byteLength out of range",
+			script: `
+				const buf = Buffer.alloc(6);
+				
+				// above the max
+				assert.throwsNodeErrorWithMessage(() => buf.writeUIntBE(0, 0, 7), RangeError, "ERR_OUT_OF_RANGE", 'The value of "byteLength" 7 is out of range.');
+				// below the min
+				assert.throwsNodeErrorWithMessage(() => buf.writeUIntBE(0, 0, 0), RangeError, "ERR_OUT_OF_RANGE", 'The value of "byteLength" 0 is out of range.');
+            `,
+		},
+		{
+			name: "number exceeds ranges",
+			script: `
+				const buf = Buffer.alloc(6);
+				// above the 6-byte max
+				assert.throwsNodeErrorWithMessage(() => buf.writeUIntBE(281474976710656, 0, 6), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 281474976710656 is out of range.');
+				// below the 6-byte min
+				assert.throwsNodeErrorWithMessage(() => buf.writeUIntBE(-1, 0, 6), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -1 is out of range.');
+				// above the 2-byte max
+				assert.throwsNodeErrorWithMessage(() => buf.writeUIntBE(65536, 0, 2), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 65536 is out of range.');
+				// below the 2-byte min
+				assert.throwsNodeErrorWithMessage(() => buf.writeUIntBE(-1, 0, 2), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -1 is out of range.');
+            `,
+		},
+		{
+			name: "writing and reading with different byte lengths",
+			script: `
+				const buf = Buffer.alloc(6);
+				buf.writeUIntBE(1, 0, 1);       // 1 byte
+				buf.writeUintBE(256, 1, 2);     // 2 bytes
+				buf.writeUIntBE(97328, 3, 3);   // 3 bytes
+				
+				assertValueRead(buf.readUIntBE(0, 1), 1);
+				assertValueRead(buf.toString('hex', 0, 1), "01");
+				assertValueRead(buf.readUIntBE(1, 2), 256);
+				assertValueRead(buf.toString('hex', 1, 3), "0100");
+				assertValueRead(buf.readUIntBE(3, 3), 97328);
+				assertValueRead(buf.toString('hex', 3, 6), "017c30");
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
+
+func TestBuffer_writeUIntLE(t *testing.T) {
+	tcs := []testCase{
+		{
+			name: "write out of range offset",
+			script: `
+				const buf = Buffer.alloc(6);
+				assert.throwsNodeErrorWithMessage(() => buf.writeUIntLE(127, 6, 1), RangeError, "ERR_OUT_OF_RANGE", 'The value of "offset" 6 is out of range.');
+            `,
+		},
+		{
+			name: "byteLength out of range",
+			script: `
+				const buf = Buffer.alloc(6);
+				
+				// above the max
+				assert.throwsNodeErrorWithMessage(() => buf.writeUIntLE(0, 0, 7), RangeError, "ERR_OUT_OF_RANGE", 'The value of "byteLength" 7 is out of range.');
+				// below the min
+				assert.throwsNodeErrorWithMessage(() => buf.writeUIntLE(0, 0, 0), RangeError, "ERR_OUT_OF_RANGE", 'The value of "byteLength" 0 is out of range.');
+            `,
+		},
+		{
+			name: "number exceeds ranges",
+			script: `
+				const buf = Buffer.alloc(6);
+				// above the 6-byte max
+				assert.throwsNodeErrorWithMessage(() => buf.writeUIntLE(281474976710656, 0, 6), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 281474976710656 is out of range.');
+				// below the 6-byte min
+				assert.throwsNodeErrorWithMessage(() => buf.writeUIntLE(-1, 0, 6), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -1 is out of range.');
+				// above the 2-byte max
+				assert.throwsNodeErrorWithMessage(() => buf.writeUIntLE(65536, 0, 2), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" 65536 is out of range.');
+				// below the 2-byte min
+				assert.throwsNodeErrorWithMessage(() => buf.writeUIntLE(-1, 0, 2), RangeError, "ERR_OUT_OF_RANGE", 'The value of "value" -1 is out of range.');
+            `,
+		},
+		{
+			name: "writing and reading with different byte lengths",
+			script: `
+				const buf = Buffer.alloc(6);
+				buf.writeUIntLE(1, 0, 1);       // 1 byte
+				buf.writeUintLE(256, 1, 2);     // 2 bytes
+				buf.writeUIntLE(97328, 3, 3);   // 3 bytes
+				
+				assertValueRead(buf.readUIntLE(0, 1), 1);
+				assertValueRead(buf.toString('hex', 0, 1), "01");
+				assertValueRead(buf.readUIntLE(1, 2), 256);
+				assertValueRead(buf.toString('hex', 1, 3), "0001");
+				assertValueRead(buf.readUIntLE(3, 3), 97328);
+				assertValueRead(buf.toString('hex', 3, 6), "307c01");
+            `,
+		},
+	}
+
+	runTestCases(t, tcs)
+}
