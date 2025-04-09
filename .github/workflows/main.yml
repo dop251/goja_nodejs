@@ -26,7 +26,7 @@ jobs:
       - name: Run staticcheck
         uses: dominikh/staticcheck-action@v1.3.1
         with:
-          version: "2024.1.1"
+          version: "2025.1.1"
           install-go: false
           cache-key: ${{ matrix.go-version }}
         if: ${{ matrix.go-version == '1.x' }}
@@ -34,3 +34,46 @@ jobs:
         env:
           GOARCH: ${{ matrix.arch }}
         run: go test -vet=off ./...
+
+  test-types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          npm ci
+          npm test --workspaces
+
+  publish-types-tagged:
+    name: 'Publish type definitions to npm (tagged)'
+    needs: [test, test-types]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract version
+        run: |
+          VERSION=$(echo "${{ github.ref }}" | sed 's|refs/tags/v||')
+          if [[ "$VERSION" == [0-9].* ]]; then
+            echo "version=$VERSION" >> $GITHUB_ENV
+          fi
+      - uses: './.github/actions/publish-types'
+        if: env.version != ''
+        with:
+          VERSION: ${{ env.version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+  publish-types-untagged:
+    name: 'Publish type definitions to npm (untagged master)'
+    needs: [ test, test-types ]
+    runs-on: ubuntu-latest
+    if: "!startsWith(github.ref, 'refs/tags/v') && github.ref_name == 'master'"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract version
+        run: |
+          VERSION=0.0.0-$(git log -1 --format=%cd --date=format:%Y%m%d%H%M%S)-$(git rev-parse --short=12 HEAD)
+          echo "version=$VERSION" >> $GITHUB_ENV
+      - uses: './.github/actions/publish-types'
+        with:
+          VERSION: ${{ env.version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
