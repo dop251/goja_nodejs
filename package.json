@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "workspaces": [
+    "global-types",
+    "url/types",
+    "buffer/types"
+  ]
+}
