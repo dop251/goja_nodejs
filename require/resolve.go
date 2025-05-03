@@ -15,6 +15,13 @@ import (
 
 const NodePrefix = "node:"
 
+func (r *RequireModule) resolvePath(base, name string) string {
+	if r.r.pathResolver != nil {
+		return r.r.pathResolver(base, name)
+	}
+	return DefaultPathResolver(base, name)
+}
+
 func parseNodeDebug() (string, []string) {
 	debug := os.Getenv("NODE_DEBUG")
 	if debug == "" {
@@ -35,11 +42,14 @@ func parseNodeDebug() (string, []string) {
 var nodeDebugMode, nodeDebugParams = parseNodeDebug()
 var moduleDebugEnabled = nodeDebugMode == "module"
 
-func (r *RequireModule) resolvePath(base, name string) string {
-	if r.r.pathResolver != nil {
-		return r.r.pathResolver(base, name)
-	}
-	return DefaultPathResolver(base, name)
+var resultColors = map[string]string{
+	"ok":        "\033[32m", // Green
+	"cached":    "\033[32m", // Green
+	"loaded":    "\033[32m", // Green
+	"native":    "\033[33m", // Yellow
+	"fatal":     "\033[31m", // Red
+	"invalid":   "\033[31m", // Red
+	"not found": "\033[90m", // Gray
 }
 
 // NodeJS module search algorithm described by
@@ -169,6 +179,7 @@ func (r *RequireModule) loadAsDirectory(modpath string) (module *js.Object, err 
 	p := r.resolvePath(modpath, "package.json")
 	buf, err := r.r.getSource(p)
 	if err != nil {
+		moduleDebug(p, "fail")
 		return r.loadIndex(modpath)
 	}
 	var pkg struct {
@@ -176,13 +187,16 @@ func (r *RequireModule) loadAsDirectory(modpath string) (module *js.Object, err 
 	}
 	err = json.Unmarshal(buf, &pkg)
 	if err != nil || len(pkg.Main) == 0 {
+		moduleDebug(fmt.Sprintf("%s:Main", p), "fail")
 		return r.loadIndex(modpath)
 	}
 
 	m := r.resolvePath(modpath, pkg.Main)
 	if module, err = r.loadAsFile(m); module != nil || err != nil {
+		moduleDebug(m, "ok")
 		return
 	}
+	moduleDebug(m, "fail")
 
 	return r.loadIndex(m)
 }
@@ -223,10 +237,17 @@ func (r *RequireModule) loadNodeModules(modpath, start string) (module *js.Objec
 func (r *RequireModule) getCurrentModulePath() string {
 	var buf [2]js.StackFrame
 	frames := r.runtime.CaptureCallStack(2, buf[:0])
+
 	if len(frames) < 2 {
 		return "."
 	}
-	return filepath.Dir(frames[1].SrcName())
+	fname := frames[1].SrcName()
+	if runtime.GOOS != "windows" {
+		if resolved, err := filepath.EvalSymlinks(fname); err == nil {
+			fname = resolved
+		}
+	}
+	return path.Dir(fname)
 }
 
 func (r *RequireModule) createModuleObject() *js.Object {
@@ -320,7 +341,12 @@ func moduleDebug(modPath string, result string) {
 			}
 		}
 		if shouldOutput {
-			println(fmt.Sprintf("resolve %s (%s)", modPath, result))
+			resultText := result
+			color, exists := resultColors[result]
+			if exists {
+				resultText = color + result + "\033[0m"
+			}
+			println(fmt.Sprintf("resolve %s (%s)", modPath, resultText))
 		}
 	}
 }
