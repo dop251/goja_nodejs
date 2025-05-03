@@ -41,20 +41,32 @@ func parseNodeDebug() (string, []string) {
 
 var nodeDebugMode, nodeDebugParams = parseNodeDebug()
 var moduleDebugEnabled = nodeDebugMode == "module"
+var currentModuleName string
 
 var resultColors = map[string]string{
 	"ok":        "\033[32m", // Green
 	"cached":    "\033[32m", // Green
 	"loaded":    "\033[32m", // Green
 	"native":    "\033[33m", // Yellow
-	"fatal":     "\033[31m", // Red
 	"invalid":   "\033[31m", // Red
 	"not found": "\033[90m", // Gray
+}
+
+func colorize(result string, toWrap string) string {
+	color, exists := resultColors[result]
+	if toWrap == "" {
+		toWrap = result
+	}
+	if exists {
+		return color + toWrap + "\033[0m"
+	}
+	return toWrap
 }
 
 // NodeJS module search algorithm described by
 // https://nodejs.org/api/modules.html#modules_all_together
 func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
+	currentModuleName = modpath
 	var start string
 	err = nil
 	if !filepath.IsAbs(modpath) {
@@ -179,7 +191,7 @@ func (r *RequireModule) loadAsDirectory(modpath string) (module *js.Object, err 
 	p := r.resolvePath(modpath, "package.json")
 	buf, err := r.r.getSource(p)
 	if err != nil {
-		moduleDebug(p, "fail")
+		moduleDebug(p, "not found")
 		return r.loadIndex(modpath)
 	}
 	var pkg struct {
@@ -187,16 +199,15 @@ func (r *RequireModule) loadAsDirectory(modpath string) (module *js.Object, err 
 	}
 	err = json.Unmarshal(buf, &pkg)
 	if err != nil || len(pkg.Main) == 0 {
-		moduleDebug(fmt.Sprintf("%s:Main", p), "fail")
+		moduleDebug(fmt.Sprintf("%s:Main", p), "not found")
 		return r.loadIndex(modpath)
 	}
 
 	m := r.resolvePath(modpath, pkg.Main)
 	if module, err = r.loadAsFile(m); module != nil || err != nil {
-		moduleDebug(m, "ok")
 		return
 	}
-	moduleDebug(m, "fail")
+	moduleDebug(m, "not found")
 
 	return r.loadIndex(m)
 }
@@ -341,12 +352,7 @@ func moduleDebug(modPath string, result string) {
 			}
 		}
 		if shouldOutput {
-			resultText := result
-			color, exists := resultColors[result]
-			if exists {
-				resultText = color + result + "\033[0m"
-			}
-			println(fmt.Sprintf("resolve %s (%s)", modPath, resultText))
+			println(fmt.Sprintf("resolve(%s) [%s] %s ", currentModuleName, colorize(result, ""), colorize(result, modPath)))
 		}
 	}
 }
