@@ -2,6 +2,8 @@ package require
 
 import (
 	"bytes"
+	"embed"
+	_ "embed"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +16,9 @@ import (
 
 	js "github.com/dop251/goja"
 )
+
+//go:embed testdata
+var testData embed.FS
 
 func mapFileSystemSourceLoader(files map[string]string) SourceLoader {
 	return func(p string) ([]byte, error) {
@@ -584,4 +589,45 @@ func TestDefaultPathResolver(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestRequireWithFS(t *testing.T) {
+	vm := js.New()
+
+	fs := os.DirFS("testdata")
+	registry := NewRegistry(WithFS(fs))
+	registry.Enable(vm)
+
+	v, err := vm.RunString(`
+	var m = require("./m.js");
+	m.test();
+	`)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !v.StrictEquals(vm.ToValue("passed")) {
+		t.Fatalf("Unexpected result: %v", v)
+	}
+
+	t.Run("embedded", func(t *testing.T) {
+		vm := js.New()
+
+		registry := NewRegistry(WithFS(testData))
+		registry.Enable(vm)
+
+		v, err := vm.RunString(`
+		var m = require("./testdata/m.js");
+		m.test();
+		`)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !v.StrictEquals(vm.ToValue("passed")) {
+			t.Fatalf("Unexpected result: %v", v)
+		}
+	})
 }

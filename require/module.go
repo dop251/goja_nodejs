@@ -48,6 +48,7 @@ type Registry struct {
 	srcLoader     SourceLoader
 	pathResolver  PathResolver
 	globalFolders []string
+	filesystems   []fs.FS
 }
 
 type RequireModule struct {
@@ -104,6 +105,16 @@ func WithGlobalFolders(globalFolders ...string) Option {
 	}
 }
 
+// WithFS sets one or more embedded filesystems to be used by the
+// [DefaultSourceLoader]. When a module is required, the [DefaultSourceLoader]
+// will first attempt to load the module from these filesystems in order before
+// falling back to the host filesystem.
+func WithFS(filesystems ...fs.FS) Option {
+	return func(r *Registry) {
+		r.filesystems = filesystems
+	}
+}
+
 // Enable adds the require() function to the specified runtime.
 func (r *Registry) Enable(runtime *js.Runtime) *RequireModule {
 	rrt := &RequireModule{
@@ -128,8 +139,20 @@ func (r *Registry) RegisterNativeModule(name string, loader ModuleLoader) {
 	r.native[name] = loader
 }
 
-// DefaultSourceLoader is used if none was set (see WithLoader()). It simply loads files from the host's filesystem.
-func DefaultSourceLoader(filename string) ([]byte, error) {
+// DefaultSourceLoader is used if none was set (see WithLoader()). It loads
+// files from the host's filesystem and from the embedded filesystems if any are
+// set in the Registry.
+func (r *Registry) DefaultSourceLoader(filename string) ([]byte, error) {
+	// Try embedded filesystems first if available
+	if len(r.filesystems) > 0 {
+		for _, filesystem := range r.filesystems {
+			if data, err := fs.ReadFile(filesystem, filename); err == nil {
+				return data, nil
+			}
+		}
+	}
+
+	// Fall back to host filesystem
 	f, err := os.Open(filename)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -173,7 +196,7 @@ func DefaultPathResolver(base, path string) string {
 func (r *Registry) getSource(p string) ([]byte, error) {
 	srcLoader := r.srcLoader
 	if srcLoader == nil {
-		srcLoader = DefaultSourceLoader
+		srcLoader = r.DefaultSourceLoader
 	}
 	return srcLoader(p)
 }
