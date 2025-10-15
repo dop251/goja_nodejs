@@ -38,6 +38,7 @@ runs:
         cd -
         for pkg in ${{ steps.vars.outputs.PKGS }}; do
           cd $pkg/types
+          npm whoami
           npm publish --dry-run --access=public
           cd -
         done
