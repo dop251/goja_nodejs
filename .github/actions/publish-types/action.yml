@@ -33,12 +33,13 @@ runs:
     - name: Publish the packages
       shell: bash
       run: |
+        npm version
+        npm install -g npm@11.5.1
         cd global-types
-        npm publish --dry-run --access=public
+        npm publish --verbose --dry-run --access=public
         cd -
         for pkg in ${{ steps.vars.outputs.PKGS }}; do
           cd $pkg/types
-          npm whoami
           npm publish --dry-run --access=public
           cd -
         done
