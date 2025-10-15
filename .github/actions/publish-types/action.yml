@@ -3,9 +3,6 @@ inputs:
   VERSION:
     description: Packages version
     required: true
-  NODE_AUTH_TOKEN:
-    description: Node auth token
-    required: true
 runs:
   using: composite
   steps:
@@ -29,20 +26,19 @@ runs:
           jq --arg version "${{ inputs.VERSION }}" '.dependencies."@dop251/types-goja_nodejs-global" = $version' $pkg/types/package.json > $pkg/types/tmp.json && mv $pkg/types/tmp.json $pkg/types/package.json
         done
     - name: Setup nodejs
-      uses: actions/setup-node@v2
+      uses: actions/setup-node@v6
       with:
         node-version: '22'
         registry-url: 'https://registry.npmjs.org'
     - name: Publish the packages
       shell: bash
       run: |
+        npm install -g npm@11.5.1
         cd global-types
-        npm publish --access=public
+        npm publish ---tag latest --access=public
         cd -
         for pkg in ${{ steps.vars.outputs.PKGS }}; do
           cd $pkg/types
-          npm publish --access=public
+          npm publish --tag latest --access=public
           cd -
         done
-      env:
-        NODE_AUTH_TOKEN: ${{ inputs.NODE_AUTH_TOKEN }}

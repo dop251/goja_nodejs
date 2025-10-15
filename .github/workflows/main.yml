@@ -1,5 +1,10 @@
 on: [push, pull_request]
 name: Test
+
+permissions:
+  id-token: write  # Required for OIDC
+  contents: read
+
 jobs:
   test:
     strategy:
@@ -60,7 +65,6 @@ jobs:
         if: env.version != ''
         with:
           VERSION: ${{ env.version }}
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
   publish-types-untagged:
     name: 'Publish type definitions to npm (untagged master)'
@@ -76,4 +80,3 @@ jobs:
       - uses: './.github/actions/publish-types'
         with:
           VERSION: ${{ env.version }}
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
