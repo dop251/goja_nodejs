@@ -33,13 +33,12 @@ runs:
     - name: Publish the packages
       shell: bash
       run: |
-        npm version
         npm install -g npm@11.5.1
         cd global-types
-        npm publish --verbose --dry-run --tag latest --access=public
+        npm publish ---tag latest --access=public
         cd -
         for pkg in ${{ steps.vars.outputs.PKGS }}; do
           cd $pkg/types
-          npm publish --dry-run --tag latest --access=public
+          npm publish --tag latest --access=public
           cd -
         done

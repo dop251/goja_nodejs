@@ -70,7 +70,7 @@ jobs:
     name: 'Publish type definitions to npm (untagged master)'
     needs: [ test, test-types ]
     runs-on: ubuntu-latest
-    if: "!startsWith(github.ref, 'refs/tags/v') && github.ref_name == 'npm-trusted-publishing'"
+    if: "!startsWith(github.ref, 'refs/tags/v') && github.ref_name == 'master'"
     steps:
       - uses: actions/checkout@v4
       - name: Extract version
