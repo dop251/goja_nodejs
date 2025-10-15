@@ -1,5 +1,10 @@
 on: [push, pull_request]
 name: Test
+
+permissions:
+  id-token: write  # Required for OIDC
+  contents: read
+
 jobs:
   test:
     strategy:
@@ -60,13 +65,12 @@ jobs:
         if: env.version != ''
         with:
           VERSION: ${{ env.version }}
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
   publish-types-untagged:
     name: 'Publish type definitions to npm (untagged master)'
     needs: [ test, test-types ]
     runs-on: ubuntu-latest
-    if: "!startsWith(github.ref, 'refs/tags/v') && github.ref_name == 'master'"
+    if: "!startsWith(github.ref, 'refs/tags/v') && github.ref_name == 'npm-trusted-publishing'"
     steps:
       - uses: actions/checkout@v4
       - name: Extract version
@@ -76,4 +80,3 @@ jobs:
       - uses: './.github/actions/publish-types'
         with:
           VERSION: ${{ env.version }}
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
