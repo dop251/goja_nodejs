@@ -69,6 +69,108 @@ const assert = {
         throw new Error(message);
     },
 
+    notSameValue(actual, unexpected, message) {
+        if (!this._isSameValue(actual, unexpected)) {
+            return;
+        }
+
+        if (message === undefined) {
+            message = '';
+        } else {
+            message += ' ';
+        }
+
+        message += 'Expected SameValue(«' + this._toString(actual) + '», «' + this._toString(unexpected) + '») to be false';
+    },
+
+    _deepStrictEqual(actual, expected) {
+        if (this._isSameValue(actual, expected)) {
+            return;
+        }
+
+        if (ArrayBuffer.isView(actual) && ArrayBuffer.isView(expected)) {
+            if (actual.constructor !== expected.constructor) {
+                return false;
+            }
+            if (actual.length !== expected.length) {
+                return false;
+            }
+            for (let i = 0; i < actual.length; i++) {
+                if (actual[i] !== expected[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        if (Array.isArray(actual) && Array.isArray(expected)) {
+            if (actual.length !== b.length) {
+                return false;
+            }
+            if (actual.length !== expected.length) {
+                return false;
+            }
+            for (let i = 0; i < actual.length; i++) {
+                if (!this._deepStrictEqual(actual[i], expected[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        if (typeof actual === 'object' && typeof expected === 'object') {
+            const keysA = Object.keys(actual);
+            const keysB = Object.keys(expected);
+
+            if (keysA.length !== keysB.length) {
+                return false;
+            }
+
+            for (const key of keysA) {
+                if (!keysB.includes(key)) {
+                    return false;
+                }
+                if (!this._deepStrictEqual(actual[key], expected[key])) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return false;
+    },
+
+    deepStrictEqual(actual, expected, message) {
+        if (this._deepStrictEqual(actual, expected)) {
+            return;
+        }
+        if (message === undefined) {
+            message = '';
+        } else {
+            message += ' ';
+        }
+
+        message += 'Expected DeepStrictEqual(«' + this._toString(actual) + '», «' + this._toString(expected) + '») to be true';
+
+        throw new Error(message);
+    },
+
+    notDeepStrictEqual(actual, expected, message) {
+        if (!this._deepStrictEqual(actual, expected)) {
+            return;
+        }
+        if (message === undefined) {
+            message = '';
+        } else {
+            message += ' ';
+        }
+
+        message += 'Expected DeepStrictEqual(«' + this._toString(actual) + '», «' + this._toString(expected) + '») to be false';
+
+        throw new Error(message);
+    },
+
     _throws(f, checks, message) {
         if (message === undefined) {
             message = '';

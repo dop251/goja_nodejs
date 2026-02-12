@@ -419,14 +419,62 @@ func (b *Buffer) proto_toString(call goja.FunctionCall) goja.Value {
 	return b.r.ToValue(codec.Encode(bb[start:end]))
 }
 
+func (b *Buffer) concat(call goja.FunctionCall) goja.Value {
+	var bufs []goja.Value
+	b.r.ForOf(goutil.RequiredArrayArgument(b.r, call, "list", 0), func(v goja.Value) bool {
+		bufs = append(bufs, v)
+		return true
+	})
+	if len(bufs) == 0 {
+		return b.fromBytes([]byte{})
+	}
+	var totalLen, totalLenArg int64
+	if len(call.Arguments) > 1 {
+		totalLenArg = goutil.RequiredStrictIntegerArgument(b.r, call, "totalLen", 1)
+		if totalLenArg < 0 {
+			panic(errors.NewRangeError(b.r, errors.ErrCodeOutOfRange, "The value of \"length\" is out of range. It must be >= 0 && <= 9007199254740991. Received %d", totalLenArg))
+		}
+	} else {
+		totalLenArg = -1
+	}
+
+	var byteBufs [][]byte
+	for i, buf := range bufs {
+		if !b.r.InstanceOf(buf, b.uint8ArrayCtorObj) {
+			panic(errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The \"list[%d]\" argument must be an instance of Buffer or Uint8Array.", i))
+		}
+		bufBytes := Bytes(b.r, buf)
+		byteBufs = append(byteBufs, bufBytes)
+		totalLen += int64(len(bufBytes))
+	}
+
+	if totalLenArg >= 0 {
+		totalLen = totalLenArg
+	}
+	res := make([]byte, totalLen)
+	offset := 0
+	for _, buf := range byteBufs {
+		n := copy(res[offset:], buf)
+		if n != len(buf) {
+			break
+		}
+		offset += n
+	}
+	return b.fromBytes(res)
+}
+
+func (b *Buffer) RequiredBufferArgument(call goja.FunctionCall, argName string, argIdx int) []byte {
+	arg := call.Argument(argIdx)
+	if b.r.InstanceOf(arg, b.uint8ArrayCtorObj) {
+		return Bytes(b.r, arg)
+	}
+	panic(errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The %q argument must be an instance of Buffer or Uint8Array.", argName))
+}
+
 func (b *Buffer) proto_equals(call goja.FunctionCall) goja.Value {
 	bb := Bytes(b.r, call.This)
-	other := call.Argument(0)
-	if b.r.InstanceOf(other, b.uint8ArrayCtorObj) {
-		otherBytes := Bytes(b.r, other)
-		return b.r.ToValue(bytes.Equal(bb, otherBytes))
-	}
-	panic(errors.NewTypeError(b.r, errors.ErrCodeInvalidArgType, "The \"otherBuffer\" argument must be an instance of Buffer or Uint8Array."))
+	otherBytes := b.RequiredBufferArgument(call, "otherBuffer", 0)
+	return b.r.ToValue(bytes.Equal(bb, otherBytes))
 }
 
 // readBigInt64BE reads a big-endian 64-bit signed integer from the buffer
@@ -1188,6 +1236,7 @@ func Require(runtime *goja.Runtime, module *goja.Object) {
 	ctor.Set("poolSize", 8192)
 	ctor.Set("from", b.from)
 	ctor.Set("alloc", b.alloc)
+	ctor.Set("concat", b.concat)
 
 	exports := module.Get("exports").(*goja.Object)
 	exports.Set("Buffer", ctor)

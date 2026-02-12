@@ -154,6 +154,45 @@ declare module "buffer" {
              */
             from(string: WithImplicitCoercion<string>, encoding?: BufferEncoding): Buffer<ArrayBuffer>;
             /**
+             * Returns a new `Buffer` which is the result of concatenating all the `Buffer` instances in the `list` together.
+             *
+             * If the list has no items, or if the `totalLength` is 0, then a new zero-length `Buffer` is returned.
+             *
+             * If `totalLength` is not provided, it is calculated from the `Buffer` instances
+             * in `list` by adding their lengths.
+             *
+             * If `totalLength` is provided, it is coerced to an unsigned integer. If the
+             * combined length of the `Buffer`s in `list` exceeds `totalLength`, the result is
+             * truncated to `totalLength`. If the combined length of the `Buffer`s in `list` is
+             * less than `totalLength`, the remaining space is filled with zeros.
+             *
+             * ```js
+             * import { Buffer } from 'node:buffer';
+             *
+             * // Create a single `Buffer` from a list of three `Buffer` instances.
+             *
+             * const buf1 = Buffer.alloc(10);
+             * const buf2 = Buffer.alloc(14);
+             * const buf3 = Buffer.alloc(18);
+             * const totalLength = buf1.length + buf2.length + buf3.length;
+             *
+             * console.log(totalLength);
+             * // Prints: 42
+             *
+             * const bufA = Buffer.concat([buf1, buf2, buf3], totalLength);
+             *
+             * console.log(bufA);
+             * // Prints: <Buffer 00 00 00 00 ...>
+             * console.log(bufA.length);
+             * // Prints: 42
+             * ```
+             *
+             * `Buffer.concat()` may also use the internal `Buffer` pool like `Buffer.allocUnsafe()` does.
+             * @since v0.7.11
+             * @param list List of `Buffer` or {@link Uint8Array} instances to concatenate.
+             * @param totalLength Total length of the `Buffer` instances in `list` when concatenated.
+             */
+            concat(list: readonly Uint8Array[], totalLength?: number): Buffer<ArrayBuffer>;            /**
              * Allocates a new `Buffer` of `size` bytes. If `fill` is `undefined`, the`Buffer` will be zero-filled.
              *
              * ```js
