@@ -3,6 +3,9 @@ package require
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -19,9 +22,51 @@ func (r *RequireModule) resolvePath(base, name string) string {
 	return DefaultPathResolver(base, name)
 }
 
+func parseNodeDebug() (string, []string) {
+	debug := os.Getenv("NODE_DEBUG")
+	if debug == "" {
+		return "", nil
+	}
+	parts := strings.Split(debug, ",")
+	for i, p := range parts {
+		parts[i] = strings.TrimSpace(p)
+	}
+	debugMode := parts[0]
+	var params []string
+	if len(parts) > 1 {
+		params = parts[1:]
+	}
+	return debugMode, params
+}
+
+var nodeDebugMode, nodeDebugParams = parseNodeDebug()
+var moduleDebugEnabled = nodeDebugMode == "module"
+var currentModuleName string
+
+var resultColors = map[string]string{
+	"ok":        "\033[32m", // Green
+	"cached":    "\033[32m", // Green
+	"loaded":    "\033[32m", // Green
+	"native":    "\033[33m", // Yellow
+	"invalid":   "\033[31m", // Red
+	"not found": "\033[90m", // Gray
+}
+
+func colorize(result string, toWrap string) string {
+	color, exists := resultColors[result]
+	if toWrap == "" {
+		toWrap = result
+	}
+	if exists {
+		return color + toWrap + "\033[0m"
+	}
+	return toWrap
+}
+
 // NodeJS module search algorithm described by
 // https://nodejs.org/api/modules.html#modules_all_together
 func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
+	currentModuleName = modpath
 	var start string
 	err = nil
 	if !filepath.IsAbs(modpath) {
@@ -31,15 +76,18 @@ func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
 	p := r.resolvePath(start, modpath)
 	if isFileOrDirectoryPath(modpath) {
 		if module = r.modules[p]; module != nil {
+			moduleDebug(p, "cached")
 			return
 		}
 		module, err = r.loadAsFileOrDirectory(p)
 		if err == nil && module != nil {
+			moduleDebug(p, "loaded")
 			r.modules[p] = module
 		}
 	} else {
 		module, err = r.loadNative(modpath)
 		if err == nil {
+			moduleDebug(modpath, "native")
 			return
 		} else {
 			if err == InvalidModuleError {
@@ -58,6 +106,7 @@ func (r *RequireModule) resolve(modpath string) (module *js.Object, err error) {
 	}
 
 	if module == nil && err == nil {
+		moduleDebug(modpath, "fatal")
 		err = InvalidModuleError
 	}
 	return
@@ -142,6 +191,7 @@ func (r *RequireModule) loadAsDirectory(modpath string) (module *js.Object, err 
 	p := r.resolvePath(modpath, "package.json")
 	buf, err := r.r.getSource(p)
 	if err != nil {
+		moduleDebug(p, "not found")
 		return r.loadIndex(modpath)
 	}
 	var pkg struct {
@@ -149,6 +199,7 @@ func (r *RequireModule) loadAsDirectory(modpath string) (module *js.Object, err 
 	}
 	err = json.Unmarshal(buf, &pkg)
 	if err != nil || len(pkg.Main) == 0 {
+		moduleDebug(fmt.Sprintf("%s:Main", p), "not found")
 		return r.loadIndex(modpath)
 	}
 
@@ -156,6 +207,7 @@ func (r *RequireModule) loadAsDirectory(modpath string) (module *js.Object, err 
 	if module, err = r.loadAsFile(m); module != nil || err != nil {
 		return
 	}
+	moduleDebug(m, "not found")
 
 	return r.loadIndex(m)
 }
@@ -196,10 +248,17 @@ func (r *RequireModule) loadNodeModules(modpath, start string) (module *js.Objec
 func (r *RequireModule) getCurrentModulePath() string {
 	var buf [2]js.StackFrame
 	frames := r.runtime.CaptureCallStack(2, buf[:0])
+
 	if len(frames) < 2 {
 		return "."
 	}
-	return filepath.Dir(frames[1].SrcName())
+	fname := frames[1].SrcName()
+	if runtime.GOOS != "windows" {
+		if resolved, err := filepath.EvalSymlinks(fname); err == nil {
+			fname = resolved
+		}
+	}
+	return path.Dir(fname)
 }
 
 func (r *RequireModule) createModuleObject() *js.Object {
@@ -231,8 +290,10 @@ func (r *RequireModule) loadModuleFile(path string, jsModule *js.Object) error {
 	prg, err := r.r.getCompiledSource(path)
 
 	if err != nil {
+		moduleDebug(path, "not found")
 		return err
 	}
+	moduleDebug(path, "ok")
 
 	f, err := r.runtime.RunProgram(prg)
 	if err != nil {
@@ -252,6 +313,7 @@ func (r *RequireModule) loadModuleFile(path string, jsModule *js.Object) error {
 			return err
 		}
 	} else {
+		moduleDebug(path, "invalid")
 		return InvalidModuleError
 	}
 
@@ -272,4 +334,25 @@ func isFileOrDirectoryPath(path string) bool {
 	}
 
 	return result
+}
+
+func moduleDebug(modPath string, result string) {
+	if moduleDebugEnabled {
+		moduleName := modPath
+		if ext := path.Ext(modPath); ext != "" {
+			moduleName = path.Base(path.Dir(modPath))
+		} else {
+			moduleName = path.Base(modPath)
+		}
+		shouldOutput := len(nodeDebugParams) == 0
+		for _, param := range nodeDebugParams {
+			if param == moduleName {
+				shouldOutput = true
+				break
+			}
+		}
+		if shouldOutput {
+			println(fmt.Sprintf("resolve(%s) [%s] %s ", currentModuleName, colorize(result, ""), colorize(result, modPath)))
+		}
+	}
 }
