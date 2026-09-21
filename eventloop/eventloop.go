@@ -55,35 +55,40 @@ type EventLoop struct {
 }
 
 func NewEventLoop(opts ...Option) *EventLoop {
-	vm := goja.New()
+    loop := &EventLoop{
+        jobChan:       make(chan func()),
+        wakeupChan:    make(chan struct{}, 1),
+        enableConsole: true,
+    }
+    loop.stopCond = sync.NewCond(&loop.stopLock)
 
-	loop := &EventLoop{
-		vm:            vm,
-		jobChan:       make(chan func()),
-		wakeupChan:    make(chan struct{}, 1),
-		enableConsole: true,
-	}
-	loop.stopCond = sync.NewCond(&loop.stopLock)
+    for _, opt := range opts {
+        opt(loop)
+    }
+    
+    if loop.vm == nil {
+        loop.vm = goja.New()
+    }
+    
+    if loop.registry == nil {
+        loop.registry = new(require.Registry)
+    }
+    
+    loop.registry.Enable(loop.vm)
+    
+    if loop.enableConsole {
+        console.Enable(loop.vm)
+    }
+    _ = loop.vm.Set("setTimeout", loop.setTimeout)
+    _ = loop.vm.Set("setInterval", loop.setInterval)
+    _ = loop.vm.Set("setImmediate", loop.setImmediate)
+    _ = loop.vm.Set("clearTimeout", loop.clearTimeout)
+    _ = loop.vm.Set("clearInterval", loop.clearInterval)
+    _ = loop.vm.Set("clearImmediate", loop.clearImmediate)
 
-	for _, opt := range opts {
-		opt(loop)
-	}
-	if loop.registry == nil {
-		loop.registry = new(require.Registry)
-	}
-	loop.registry.Enable(vm)
-	if loop.enableConsole {
-		console.Enable(vm)
-	}
-	vm.Set("setTimeout", loop.setTimeout)
-	vm.Set("setInterval", loop.setInterval)
-	vm.Set("setImmediate", loop.setImmediate)
-	vm.Set("clearTimeout", loop.clearTimeout)
-	vm.Set("clearInterval", loop.clearInterval)
-	vm.Set("clearImmediate", loop.clearImmediate)
-
-	return loop
+    return loop
 }
+
 
 type Option func(*EventLoop)
 
@@ -101,6 +106,13 @@ func WithRegistry(registry *require.Registry) Option {
 	return func(loop *EventLoop) {
 		loop.registry = registry
 	}
+}
+
+// WithRuntime sets the runtime used by the loop.
+func WithRuntime(vm *goja.Runtime) Option {
+    return func(loop *EventLoop) {
+        loop.vm = vm
+    }
 }
 
 func (loop *EventLoop) schedule(call goja.FunctionCall, repeating bool) goja.Value {
